@@ -1,12 +1,7 @@
-export type ConnectionInfo = {
-  npub: string;
-  pubkey: string;
-  npubUri: string;
-  hexUri: string;
-  relays: string[];
-  secret?: string | null;
-  nostrRelays: string[];
-};
+import type { ConnectionInfo } from '@signet/types';
+
+// Re-export for backwards compatibility
+export type { ConnectionInfo } from '@signet/types';
 
 function resolveConnectionInfoUrl(): string {
   const fromEnv = import.meta.env.VITE_BUNKER_INFO_URL;

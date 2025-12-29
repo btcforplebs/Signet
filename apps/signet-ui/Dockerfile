@@ -1,17 +1,24 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
-COPY . .
-RUN npm run build
+RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/signet-ui/package.json ./apps/signet-ui/
+COPY packages/signet-types/package.json ./packages/signet-types/
+RUN pnpm install --frozen-lockfile
+COPY packages/signet-types ./packages/signet-types
+COPY apps/signet-ui ./apps/signet-ui
+WORKDIR /app/packages/signet-types
+RUN pnpm build
+WORKDIR /app/apps/signet-ui
+RUN pnpm build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json ./
-RUN npm install --omit=dev
-COPY --from=build /app/dist ./dist
-COPY server.mjs ./server.mjs
+COPY --from=build /app/apps/signet-ui/dist ./dist
+COPY --from=build /app/apps/signet-ui/server.mjs ./server.mjs
+# Install server dependencies
+RUN npm install express http-proxy-middleware
 ENV PORT=4174
 ENV HOST=0.0.0.0
 ENV DAEMON_URL=http://signet:3000

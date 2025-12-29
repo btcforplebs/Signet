@@ -1,0 +1,194 @@
+import Fastify, { type FastifyInstance } from 'fastify';
+import FastifyFormBody from '@fastify/formbody';
+import FastifyView from '@fastify/view';
+import Handlebars from 'handlebars';
+import {
+    registerAuthPlugins,
+    createAuthMiddleware,
+    createRateLimitMiddleware,
+    createCsrfMiddleware,
+    generateCsrfToken,
+    setCsrfCookie,
+    isAllowedOrigin,
+} from '../lib/auth.js';
+import { registerConnectionRoutes, type ConnectionRouteConfig } from './routes/connection.js';
+import { registerRequestRoutes, type RequestsRouteConfig } from './routes/requests.js';
+import { registerKeysRoutes, type KeysRouteConfig } from './routes/keys.js';
+import { registerAppsRoutes, type AppsRouteConfig } from './routes/apps.js';
+import { registerDashboardRoutes, type DashboardRouteConfig } from './routes/dashboard.js';
+import { registerTokensRoutes } from './routes/tokens.js';
+import { registerPoliciesRoutes } from './routes/policies.js';
+import { registerEventsRoutes } from './routes/events.js';
+import type { KeyService, RequestService, AppService, DashboardService, EventService, RelayService } from '../services/index.js';
+import type { ConnectionManager } from '../connection-manager.js';
+import type { NostrConfig } from '../../config/types.js';
+
+export interface HttpServerConfig {
+    port: number;
+    host: string;
+    baseUrl?: string;
+    jwtSecret?: string;
+    allowedOrigins: string[];
+    requireAuth: boolean;
+    connectionManager: ConnectionManager;
+    nostrConfig: NostrConfig;
+    keyService: KeyService;
+    requestService: RequestService;
+    appService: AppService;
+    dashboardService: DashboardService;
+    eventService: EventService;
+    relayService: RelayService;
+}
+
+export class HttpServer {
+    private readonly fastify: FastifyInstance;
+    private readonly config: HttpServerConfig;
+
+    constructor(config: HttpServerConfig) {
+        this.config = config;
+        this.fastify = Fastify({ logger: { level: 'warn' } });
+    }
+
+    getFastify(): FastifyInstance {
+        return this.fastify;
+    }
+
+    async start(): Promise<void> {
+        await this.setupMiddleware();
+        await this.setupRoutes();
+        await this.listen();
+    }
+
+    private async setupMiddleware(): Promise<void> {
+        await this.fastify.register(FastifyFormBody);
+
+        // Parse baseUrl safely
+        let urlPrefix = '';
+        if (this.config.baseUrl) {
+            try {
+                urlPrefix = new URL(this.config.baseUrl).pathname.replace(/\/+$/, '');
+            } catch (error) {
+                console.log(`⚠️ Invalid baseUrl in config: ${this.config.baseUrl}`);
+            }
+        }
+
+        // Register authentication plugins
+        if (this.config.jwtSecret) {
+            await registerAuthPlugins(this.fastify, this.config.jwtSecret);
+        } else {
+            console.log('⚠️ No JWT secret configured - authentication will not work');
+        }
+
+        // CORS handling with origin validation
+        const allowedOrigins = this.config.allowedOrigins;
+        this.fastify.addHook('onRequest', async (request, reply) => {
+            const origin = request.headers.origin;
+
+            if (origin && isAllowedOrigin(origin, allowedOrigins)) {
+                reply.header('Access-Control-Allow-Origin', origin);
+                reply.header('Vary', 'Origin');
+                reply.header('Access-Control-Allow-Credentials', 'true');
+                reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+                reply.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+            }
+
+            if (request.method === 'OPTIONS') {
+                reply.status(204);
+                return reply.send();
+            }
+        });
+
+        // View engine for templates
+        await this.fastify.register(FastifyView, {
+            engine: { handlebars: Handlebars },
+            defaultContext: { urlPrefix },
+        });
+    }
+
+    private async setupRoutes(): Promise<void> {
+        const authMiddleware = createAuthMiddleware(this.fastify, this.config.requireAuth);
+        const csrfMiddleware = createCsrfMiddleware();
+        const rateLimitAuth = createRateLimitMiddleware('auth');
+        const rateLimitKeys = createRateLimitMiddleware('keys');
+
+        // Determine if we should use secure cookies (HTTPS)
+        const useSecureCookies = this.config.baseUrl?.startsWith('https://') ?? false;
+
+        // Health check endpoint (no auth required)
+        this.fastify.get('/health', async (_request, reply) => {
+            return reply.send({ status: 'ok' });
+        });
+
+        // CSRF token endpoint - provides a fresh token to the client
+        this.fastify.get('/csrf-token', { preHandler: [authMiddleware] }, async (_request, reply) => {
+            const token = generateCsrfToken();
+            setCsrfCookie(reply, token, useSecureCookies);
+            return reply.send({ token });
+        });
+
+        // Connection routes (GET only, no CSRF needed)
+        registerConnectionRoutes(this.fastify, {
+            connectionManager: this.config.connectionManager,
+            nostrConfig: this.config.nostrConfig,
+            relayService: this.config.relayService,
+        }, [authMiddleware]);
+
+        // Request routes (state-changing, needs CSRF)
+        registerRequestRoutes(this.fastify, {
+            requestService: this.config.requestService,
+            appService: this.config.appService,
+        }, {
+            auth: [authMiddleware],
+            csrf: [csrfMiddleware],
+            rateLimit: [rateLimitAuth],
+        });
+
+        // Key routes (state-changing, needs CSRF)
+        registerKeysRoutes(this.fastify, {
+            keyService: this.config.keyService,
+        }, {
+            auth: [authMiddleware],
+            csrf: [csrfMiddleware],
+            rateLimit: [rateLimitKeys],
+        });
+
+        // App routes (state-changing, needs CSRF)
+        registerAppsRoutes(this.fastify, {
+            appService: this.config.appService,
+        }, {
+            auth: [authMiddleware],
+            csrf: [csrfMiddleware],
+        });
+
+        // Dashboard routes (GET only, no CSRF needed)
+        registerDashboardRoutes(this.fastify, {
+            dashboardService: this.config.dashboardService,
+        }, [authMiddleware]);
+
+        // Token routes (state-changing, needs CSRF)
+        registerTokensRoutes(this.fastify, {
+            auth: [authMiddleware],
+            csrf: [csrfMiddleware],
+            rateLimit: [rateLimitAuth],
+        });
+
+        // Policy routes (state-changing, needs CSRF)
+        registerPoliciesRoutes(this.fastify, {
+            auth: [authMiddleware],
+            csrf: [csrfMiddleware],
+            rateLimit: [rateLimitAuth],
+        });
+
+        // Events routes (SSE, GET only, no CSRF needed)
+        registerEventsRoutes(this.fastify, {
+            eventService: this.config.eventService,
+        }, [authMiddleware]);
+    }
+
+    private async listen(): Promise<void> {
+        await this.fastify.listen({
+            port: this.config.port,
+            host: this.config.host,
+        });
+    }
+}

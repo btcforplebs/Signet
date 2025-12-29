@@ -1,35 +1,120 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import crypto from 'crypto';
 import type { ConfigFile } from './types.js';
 
+/**
+ * Generate a cryptographically secure secret
+ */
+function generateSecret(bytes: number = 32): string {
+    return crypto.randomBytes(bytes).toString('hex');
+}
+
 export async function loadConfig(configPath: string): Promise<ConfigFile> {
+    let config: ConfigFile;
+    let needsSave = false;
+
     if (!existsSync(configPath)) {
-        // Return default config if file doesn't exist
-        return {
+        // Create default config on first boot
+        config = {
             nostr: {
-                relays: ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol'],
+                relays: [
+                    'wss://relay.nip46.com',
+                    'wss://relay.primal.net',
+                    'wss://relay.damus.io',
+                    'wss://theforest.nostr1.com',
+                    'wss://nostr.oxtr.dev',
+                ],
             },
             admin: {
-                npubs: [],
-                adminRelays: ['wss://relay.nsec.app'],
-                key: '',
-                notifyAdminsOnBoot: false,
+                key: generateSecret(32),
+                secret: generateSecret(32),
             },
             database: 'sqlite://signet.db',
             logs: './signet.log',
             keys: {},
             verbose: false,
+            jwtSecret: generateSecret(32),
+            allowedOrigins: [
+                'http://localhost:4174',
+                'http://localhost:3000',
+                'http://127.0.0.1:4174',
+                'http://127.0.0.1:3000',
+            ],
+            authPort: 3000,
+            authHost: '0.0.0.0',
+            baseUrl: 'http://localhost:4174',
+            requireAuth: false,
         };
+        needsSave = true;
+    } else {
+        const contents = readFileSync(configPath, 'utf8');
+        config = JSON.parse(contents) as ConfigFile;
+
+        // Ensure required fields exist with defaults
+        config.nostr ??= { relays: ['wss://relay.primal.net'] };
+        config.admin ??= { key: '' };
+        config.keys ??= {};
+        config.verbose ??= false;
+
+        // Auto-generate admin key if not present
+        if (!config.admin.key) {
+            config.admin.key = generateSecret(32);
+            needsSave = true;
+        }
+
+        // Auto-generate admin secret (for bunker URI) if not present
+        if (!config.admin.secret) {
+            config.admin.secret = generateSecret(32);
+            needsSave = true;
+        }
+
+        // Generate JWT secret if not present
+        if (!config.jwtSecret) {
+            config.jwtSecret = generateSecret(32);
+            needsSave = true;
+        }
+
+        // Set default allowed origins if not present
+        if (!config.allowedOrigins) {
+            config.allowedOrigins = [
+                'http://localhost:4174',
+                'http://localhost:3000',
+                'http://127.0.0.1:4174',
+                'http://127.0.0.1:3000',
+            ];
+            needsSave = true;
+        }
+
+        // Set default authPort if not present (enables HTTP server)
+        if (config.authPort === undefined) {
+            config.authPort = 3000;
+            needsSave = true;
+        }
+
+        // Set default authHost if not present
+        if (config.authHost === undefined) {
+            config.authHost = '0.0.0.0';
+            needsSave = true;
+        }
+
+        // Set default baseUrl if not present (for authorization redirects)
+        if (config.baseUrl === undefined) {
+            config.baseUrl = 'http://localhost:4174';
+            needsSave = true;
+        }
+
+        // Set default requireAuth if not present
+        if (config.requireAuth === undefined) {
+            config.requireAuth = false;
+            needsSave = true;
+        }
     }
 
-    const contents = readFileSync(configPath, 'utf8');
-    const config = JSON.parse(contents) as ConfigFile;
-
-    // Ensure required fields exist with defaults
-    config.nostr ??= { relays: ['wss://relay.damus.io'] };
-    config.admin ??= { npubs: [], adminRelays: ['wss://relay.nsec.app'], key: '' };
-    config.keys ??= {};
-    config.verbose ??= false;
+    // Persist auto-generated config/secrets
+    if (needsSave) {
+        await saveConfig(configPath, config);
+    }
 
     return config;
 }

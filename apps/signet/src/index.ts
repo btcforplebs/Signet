@@ -2,21 +2,8 @@
 import 'websocket-polyfill';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { runSetup } from './commands/setup.js';
 import { addKey } from './commands/add.js';
 import { runStart } from './commands/start.js';
-
-function parseEnvAdmins(): string[] {
-    const raw = process.env.ADMIN_NPUBS;
-    if (!raw) {
-        return [];
-    }
-
-    return raw
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-}
 
 yargs(hideBin(process.argv))
     .scriptName('signet')
@@ -26,14 +13,6 @@ yargs(hideBin(process.argv))
         default: 'config/signet.json',
         describe: 'Path to the configuration file',
     })
-    .command(
-        'setup',
-        'Add an administrator npub',
-        () => {},
-        async (argv) => {
-            await runSetup(argv.config as string);
-        }
-    )
     .command(
         'add',
         'Encrypt and store an nsec',
@@ -61,12 +40,6 @@ yargs(hideBin(process.argv))
                     array: true,
                     describe: 'Key label to unlock at startup',
                 })
-                .option('admin', {
-                    alias: 'a',
-                    type: 'string',
-                    array: true,
-                    describe: 'Administrator npub',
-                })
                 .option('verbose', {
                     alias: 'v',
                     type: 'boolean',
@@ -74,17 +47,10 @@ yargs(hideBin(process.argv))
                     describe: 'Enable verbose logging',
                 }),
         async (argv) => {
-            const providedAdmins = argv.admin ? (argv.admin as string[]) : [];
-            const envAdmins = parseEnvAdmins();
-            const combinedAdmins = Array.from(
-                new Set([...providedAdmins, ...envAdmins])
-            );
-
             await runStart({
                 configPath: argv.config as string,
                 keyNames: argv.key ? (argv.key as string[]) : undefined,
                 verbose: Boolean(argv.verbose),
-                adminNpubs: combinedAdmins.length ? combinedAdmins : undefined,
             });
         }
     )

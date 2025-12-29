@@ -1,0 +1,224 @@
+/* ============================================
+   Settings Panel - Linear-inspired
+   ============================================ */
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0 0 var(--space-6) 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+/* Section */
+.section {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Setting Row */
+.setting {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) 0;
+}
+
+.setting:not(:last-child) {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settingInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settingLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+.settingDescription {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--surface-2);
+  border-radius: var(--radius-full);
+  transition: var(--transition-fast);
+}
+
+.toggleSlider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-muted);
+  border-radius: 50%;
+  transition: var(--transition-fast);
+}
+
+.toggle input:checked + .toggleSlider {
+  background-color: var(--accent);
+}
+
+.toggle input:checked + .toggleSlider::before {
+  background-color: white;
+  transform: translateX(20px);
+}
+
+/* Select */
+.select {
+  padding: var(--space-2) var(--space-3);
+  padding-right: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.select:hover {
+  border-color: var(--border-strong);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Enable Button */
+.enableButton {
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.enableButton:hover {
+  background: var(--accent-hover);
+}
+
+/* Status Text */
+.unsupported,
+.denied {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.denied {
+  color: var(--danger);
+}
+
+/* About Section */
+.about {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.about p {
+  margin: 0 0 var(--space-3) 0;
+}
+
+.about p:last-child {
+  margin-bottom: 0;
+}
+
+.version {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .setting {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .section {
+    padding: var(--space-4);
+  }
+}
+
+@media (pointer: coarse) {
+  .toggle {
+    width: 52px;
+    height: 28px;
+  }
+
+  .toggleSlider::before {
+    height: 22px;
+    width: 22px;
+  }
+
+  .toggle input:checked + .toggleSlider::before {
+    transform: translateX(24px);
+  }
+
+  .enableButton {
+    min-height: 44px;
+  }
+}

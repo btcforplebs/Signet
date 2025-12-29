@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "apps/signet",
-    "apps/signet-ui"
+    "apps/signet-ui",
+    "packages/*"
   ],
   "scripts": {
     "build": "npm run build --workspace signet",

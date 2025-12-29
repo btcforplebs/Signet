@@ -1,0 +1,54 @@
+/**
+ * Trust level for an app - determines auto-approval behavior
+ */
+export type TrustLevel = 'paranoid' | 'reasonable' | 'full';
+
+/**
+ * Method usage counts for an app
+ */
+export interface MethodBreakdown {
+    sign_event: number;
+    nip04_encrypt: number;
+    nip04_decrypt: number;
+    nip44_encrypt: number;
+    nip44_decrypt: number;
+    get_public_key: number;
+    other: number;
+}
+
+/**
+ * A connected application/client with access to a key
+ */
+export interface ConnectedApp {
+    id: number;
+    keyName: string;
+    userPubkey: string;
+    description?: string;
+    trustLevel: TrustLevel;
+    permissions: string[];
+    connectedAt: string;
+    lastUsedAt: string | null;
+    requestCount: number;
+    methodBreakdown: MethodBreakdown;
+}
+
+/**
+ * Permission risk level for display
+ */
+export type PermissionRisk = 'high' | 'medium' | 'low';
+
+/**
+ * Request body for updating an app
+ */
+export interface UpdateAppRequest {
+    description?: string;
+    trustLevel?: TrustLevel;
+}
+
+/**
+ * Response from app operations
+ */
+export interface AppOperationResponse {
+    ok: boolean;
+    error?: string;
+}

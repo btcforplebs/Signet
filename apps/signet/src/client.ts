@@ -12,7 +12,7 @@ import path from 'path';
 const argv = process.argv.slice(2);
 const command = argv[0];
 let remoteTarget = argv[1];
-let payload = argv[2];
+const payload = argv[2];
 
 const dontPublish = process.argv.includes('--dont-publish');
 const debug = process.argv.includes('--debug');
@@ -28,11 +28,9 @@ function extractRelays(): string[] {
 const extraRelays = extractRelays();
 
 if (!command || !remoteTarget) {
-    console.log('Usage: node client <command> <remote-npub-or-nip05-or-bunker-token> <content> [--dont-publish] [--debug] [--relays <relay1,relay2>]');
+    console.log('Usage: node client sign <remote-npub-or-nip05-or-bunker-token> <content> [--dont-publish] [--debug] [--relays <relay1,relay2>]');
     console.log('');
-    console.log('\tcommand: sign | create_account');
-    console.log('\tcontent (sign): JSON event or text for kind 1');
-    console.log('\tcontent (create_account): username[,domain[,email]]');
+    console.log('\tcontent: JSON event or text for kind 1');
     process.exit(1);
 }
 
@@ -46,7 +44,7 @@ if (bunkerToken) {
             throw new Error('No relays found in bunker token');
         }
     } catch (error) {
-        console.log(`❌ Invalid bunker token: ${(error as Error).message}`);
+        console.log(`Invalid bunker token: ${(error as Error).message}`);
         process.exit(1);
     }
 }
@@ -97,33 +95,6 @@ async function resolveRemoteUser(ndk: NDK): Promise<NDKUser> {
     return new NDKUser({ npub: remoteTarget });
 }
 
-async function prepareCreateAccount(ndk: NDK): Promise<NDKUser> {
-    if (remoteTarget.startsWith('npub')) {
-        return new NDKUser({ npub: remoteTarget });
-    }
-
-    const [username, domain, email] = (payload ?? '').split(',').map((value) => value.trim());
-    const targetDomain = domain || remoteTarget;
-    const targetUsername = username || Math.random().toString(36).slice(2, 12);
-
-    payload = [targetUsername, targetDomain, email ?? ''].join(',');
-
-    const identifiers = new Set([`_@${targetDomain}`]);
-    if (remoteTarget.includes('@')) {
-        identifiers.add(remoteTarget);
-    }
-
-    for (const identifier of identifiers) {
-        const candidate = await NDKUser.fromNip05(identifier, ndk);
-        if (candidate) {
-            remoteTarget = candidate.npub;
-            return candidate;
-        }
-    }
-
-    throw new Error(`Unable to resolve ${remoteTarget}`);
-}
-
 async function createNdk(relaysOverride: string[] = []): Promise<NDK> {
     const ndk = new NDK({
         explicitRelayUrls: buildRelays(relaysOverride),
@@ -131,7 +102,7 @@ async function createNdk(relaysOverride: string[] = []): Promise<NDK> {
     });
 
     if (debug) {
-        ndk.pool.on('relay:disconnect', (relay) => console.log(`❌ disconnected from ${relay.url}`));
+        ndk.pool.on('relay:disconnect', (relay) => console.log(`Disconnected from ${relay.url}`));
     }
 
     await ndk.connect(5_000);
@@ -151,7 +122,7 @@ async function ensureLocalSigner(): Promise<NDKPrivateKeySigner> {
 
 async function signCommand(ndk: NDK, signer: NDKNip46Signer): Promise<void> {
     if (debug) {
-        console.log('Waiting for authorization…');
+        console.log('Waiting for authorization...');
     }
 
     const remoteUser = await signer.blockUntilReady();
@@ -169,12 +140,11 @@ async function signCommand(ndk: NDK, signer: NDKNip46Signer): Promise<void> {
         event.tags ??= [];
         event.content ??= '';
     } catch (error) {
-        const nostrEvent: NostrEvent = {
-            kind: 1,
-            content: payload ?? '',
-            tags: [['client', 'signet-client']],
-        };
-        event = new NDKEvent(ndk, nostrEvent);
+        // Create a minimal event - NDK will fill in created_at and pubkey when signing
+        event = new NDKEvent(ndk);
+        event.kind = 1;
+        event.content = payload ?? '';
+        event.tags = [['client', 'signet-client']];
     }
 
     await event.sign();
@@ -187,13 +157,6 @@ async function signCommand(ndk: NDK, signer: NDKNip46Signer): Promise<void> {
     if (!dontPublish) {
         await event.publish();
     }
-}
-
-async function createAccountCommand(signer: NDKNip46Signer): Promise<void> {
-    const [username, domain, email] = (payload ?? '').split(',').map((value) => value.trim());
-    const pubkey = await signer.createAccount(username, domain, email);
-    const created = new NDKUser({ pubkey });
-    console.log(`Account created: ${created.npub}`);
 }
 
 (async () => {
@@ -209,14 +172,9 @@ async function createAccountCommand(signer: NDKNip46Signer): Promise<void> {
         let nip46Signer: NDKNip46Signer;
 
         if (bunkerToken) {
-            if (command === 'create_account') {
-                console.log('❌ bunker tokens cannot be used with create_account');
-                process.exit(1);
-            }
             nip46Signer = NDKNip46Signer.bunker(ndk, bunkerToken, localSigner);
         } else {
-            const remoteUser =
-                command === 'create_account' ? await prepareCreateAccount(ndk) : await resolveRemoteUser(ndk);
+            const remoteUser = await resolveRemoteUser(ndk);
 
             if (debug) {
                 console.log(`Remote signer: ${remoteUser.npub}`);
@@ -229,19 +187,14 @@ async function createAccountCommand(signer: NDKNip46Signer): Promise<void> {
             console.log(`Authorize this request at ${url}`);
         });
 
-        switch (command) {
-            case 'sign':
-                await signCommand(ndk, nip46Signer);
-                break;
-            case 'create_account':
-                await createAccountCommand(nip46Signer);
-                break;
-            default:
-                console.log(`Unknown command "${command}"`);
-                process.exit(1);
+        if (command === 'sign') {
+            await signCommand(ndk, nip46Signer);
+        } else {
+            console.log(`Unknown command "${command}"`);
+            process.exit(1);
         }
     } catch (error) {
-        console.log(`❌ ${(error as Error).message}`);
+        console.log(`Error: ${(error as Error).message}`);
         process.exit(1);
     }
 })();

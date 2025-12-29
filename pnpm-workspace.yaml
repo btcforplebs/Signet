@@ -1,3 +1,7 @@
 packages:
   - apps/signet
   - apps/signet-ui
+  - packages/*
+
+onlyBuiltDependencies:
+  - prisma

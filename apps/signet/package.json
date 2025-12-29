@@ -1,6 +1,6 @@
 {
   "name": "signet",
-  "version": "0.10.5",
+  "version": "1.0.0-beta",
   "description": "Signet - Modern NIP-46 remote signer",
   "main": "dist/index.js",
   "bin": {
@@ -27,7 +27,10 @@
     "start": "node ./scripts/start.js",
     "lfg": "node ./scripts/start.js start",
     "signet": "node dist/index.js",
-    "client": "node dist/client/client.js"
+    "client": "node dist/client/client.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "nostr"
@@ -35,24 +38,26 @@
   "author": "pablof7z",
   "license": "MIT",
   "dependencies": {
-    "@fastify/formbody": "^7.4.0",
-    "@fastify/view": "^8.2.0",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/formbody": "^8.0.2",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/view": "^10.0.2",
     "@inquirer/password": "^1.1.2",
     "@inquirer/prompts": "^1.2.3",
     "@nostr-dev-kit/ndk": "^2.18.1",
-    "@prisma/client": "^6.18.0",
+    "@prisma/adapter-better-sqlite3": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "better-sqlite3": "^12.5.0",
     "@scure/base": "^1.2.6",
+    "@signet/types": "workspace:*",
     "@types/yargs": "^17.0.33",
-    "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
-    "crypto-js": "^4.2.0",
     "debug": "^4.4.3",
     "dotenv": "^16.6.1",
     "eslint-config-prettier": "^8.10.2",
     "eslint-plugin-import": "^2.32.0",
     "eventemitter3": "^5.0.1",
-    "express": "^4.21.2",
-    "fastify": "^4.29.1",
+    "fastify": "^5.2.1",
     "handlebars": "^4.7.8",
     "isomorphic-ws": "^5.0.0",
     "lnbits": "^1.1.5",
@@ -60,14 +65,16 @@
     "nostr-tools": "^2.17.0",
     "websocket-polyfill": "^0.0.3",
     "ws": "^8.18.3",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "prisma": "^7.2.0"
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
-    "@types/node": "^18.19.130",
-    "prisma": "^6.18.0",
+    "@types/node": "^20.19.0",
+    "@vitest/coverage-v8": "^4.0.16",
     "ts-node": "^10.9.2",
     "tsup": "^8.0.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
   }
 }

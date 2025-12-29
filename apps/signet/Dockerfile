@@ -1,42 +1,73 @@
-FROM node:20.11-bullseye AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm install
+# Install pnpm and build tools for native modules (better-sqlite3)
+RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN apk add --no-cache python3 make g++
 
-# Copy application files
-COPY . .
+# Copy root workspace files
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
-# Generate prisma client and build the application
-RUN npx prisma generate
-RUN npm run build
+# Copy package.json files for all workspaces
+COPY apps/signet/package.json ./apps/signet/
+COPY packages/signet-types/package.json ./packages/signet-types/
 
-# Remove dev dependencies to reduce size
-RUN npm prune --production
+# Install dependencies
+ENV CI=true
+RUN pnpm install --frozen-lockfile
 
-# Runtime stage
-FROM node:20.11-alpine AS runtime
+# Force rebuild better-sqlite3 from source for Alpine/musl compatibility
+# prebuild-install downloads glibc binaries by default; we need musl
+RUN BETTER_SQLITE3_DIR=$(find /app/node_modules -type d -name "better-sqlite3" -path "*/.pnpm/*" | head -1) && \
+    cd "$BETTER_SQLITE3_DIR" && \
+    rm -rf prebuilds build && \
+    npm run build-release
+
+# Copy source files
+COPY packages/signet-types ./packages/signet-types
+COPY apps/signet ./apps/signet
+
+# Build shared types first, then daemon
+WORKDIR /app/packages/signet-types
+RUN pnpm build
+
+WORKDIR /app/apps/signet
+ENV DATABASE_URL="file:/app/config/signet.db"
+RUN pnpm prisma generate
+RUN pnpm build
+
+# Runtime stage - copy everything from build instead of reinstalling
+FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
-RUN apk update && \
-    apk add --no-cache openssl wget && \
-    rm -rf /var/cache/apk/*
+# Only need runtime dependencies, not build tools
+RUN apk add --no-cache openssl wget
 
-# Copy package files and node_modules from build stage
-COPY --from=build /app/package*.json ./
+# Copy the entire workspace with compiled node_modules from build
 COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./
+COPY --from=build /app/pnpm-workspace.yaml ./
+COPY --from=build /app/packages/signet-types ./packages/signet-types
 
-# Copy Prisma schema and generate client
-COPY --from=build /app/prisma ./prisma
-RUN npx prisma generate
+# Copy app with its node_modules and built files
+COPY --from=build /app/apps/signet/node_modules ./apps/signet/node_modules
+COPY --from=build /app/apps/signet/package.json ./apps/signet/
+COPY --from=build /app/apps/signet/dist ./apps/signet/dist
+COPY --from=build /app/apps/signet/prisma ./apps/signet/prisma
+COPY --from=build /app/apps/signet/prisma.config.ts ./apps/signet/prisma.config.ts
+COPY --from=build /app/apps/signet/entrypoint.sh ./apps/signet/entrypoint.sh
 
-# Copy built application
-COPY --from=build /app/dist ./dist
+RUN chmod +x ./apps/signet/entrypoint.sh
+
+# Install pnpm for runtime commands (prisma migrate)
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app/apps/signet
+ENV DATABASE_URL="file:/app/config/signet.db"
 
 EXPOSE 3000
 
-ENTRYPOINT [ "node", "./dist/index.js" ]
-CMD ["start"]
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["start", "--config", "/app/config/signet.json"]

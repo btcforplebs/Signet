@@ -1,0 +1,29 @@
+/* ============================================
+   Page Header - Consistent header for all pages
+   ============================================ */
+
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.header {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.count {
+  font-weight: var(--font-normal);
+  color: var(--text-tertiary);
+  margin-left: var(--space-2);
+}
+
+.action {
+  flex-shrink: 0;
+}

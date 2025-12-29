@@ -12,11 +12,45 @@ const port = Number.parseInt(process.env.PORT ?? '4174', 10);
 const host = process.env.HOST ?? '0.0.0.0';
 const daemonUrl = process.env.DAEMON_URL ?? 'http://signet:3000';
 
-const apiProxy = createProxyMiddleware(['/requests', '/register', '/connection'], {
+// SSE-specific proxy for /events endpoint (no timeout, streaming)
+const sseProxy = createProxyMiddleware({
+  target: daemonUrl,
+  changeOrigin: true,
+  ws: false,
+  // No timeout for SSE connections
+  proxyTimeout: 0,
+  timeout: 0,
+  pathFilter: ['/events'],
+  onProxyReq(proxyReq, req, res) {
+    // Ensure headers are set correctly for SSE
+    proxyReq.setHeader('Accept', 'text/event-stream');
+    proxyReq.setHeader('Cache-Control', 'no-cache');
+    proxyReq.setHeader('Connection', 'keep-alive');
+  },
+  onProxyRes(proxyRes, req, res) {
+    // Disable buffering for SSE
+    proxyRes.headers['x-accel-buffering'] = 'no';
+    proxyRes.headers['cache-control'] = 'no-cache, no-transform';
+  },
+  onError(err, req, res) {
+    console.error('SSE proxy error:', err.message);
+    if (res.headersSent) {
+      return;
+    }
+    res.status(502).json({
+      ok: false,
+      error: `SSE proxy error: ${err instanceof Error ? err.message : 'unknown error'}`
+    });
+  }
+});
+
+// API proxy for other endpoints
+const apiProxy = createProxyMiddleware({
   target: daemonUrl,
   changeOrigin: true,
   ws: false,
   proxyTimeout: 10_000,
+  pathFilter: ['/requests', '/register', '/connection', '/relays', '/keys', '/apps', '/dashboard', '/health', '/tokens', '/policies', '/csrf-token'],
   onError(err, req, res) {
     if (res.headersSent) {
       return;
@@ -31,12 +65,14 @@ const apiProxy = createProxyMiddleware(['/requests', '/register', '/connection']
   }
 });
 
+// SSE proxy must come first (more specific route)
+app.use(sseProxy);
 app.use(apiProxy);
 
 const distDir = path.join(__dirname, 'dist');
 app.use(express.static(distDir));
 
-app.get('*', (_req, res) => {
+app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
 });
 

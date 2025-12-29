@@ -1,20 +1,62 @@
-node_modules/
-.env
+# Git
 .git/
 .gitignore
-.npmrc
-.dockerignore
-.DS_Store
-npm-debug.log
+
+# Dependencies (rebuilt in container)
+**/node_modules/
+
+# Build output (rebuilt in container)
+**/dist/
+**/build/
+**/.svelte-kit/
+
+# Runtime config & secrets
+.env*
+signet.json
+connection*.txt
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
 logs/
-tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# Testing
 coverage/
-dist/
+.nyc_output/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
+**/testing/
+
+# Build caches
+.vite/
+.turbo
+
+# Docker (avoid recursion)
+**/Dockerfile
+**/.dockerignore
+docker-compose*.yml
+
+# Misc
 *.md
 *.tar.gz
 *.zip
-Dockerfile
-
-signet.json
-connection.txt
-config
+tmp/
