@@ -80,7 +80,7 @@ interface RequestsPanelProps {
   sortBy: SortBy;
   onFilterChange: (filter: RequestFilter) => void;
   onPasswordChange: (id: string, password: string) => void;
-  onApprove: (id: string, trustLevel?: TrustLevel) => void;
+  onApprove: (id: string, trustLevel?: TrustLevel, alwaysAllow?: boolean, allowKind?: number) => void;
   onLoadMore: () => void;
   onToggleSelectionMode: () => void;
   onToggleSelection: (id: string) => void;
@@ -306,7 +306,7 @@ export function RequestsPanel({
                     selectionMode={selectionMode}
                     selected={selectedIds.has(request.id)}
                     onPasswordChange={(pw) => onPasswordChange(request.id, pw)}
-                    onApprove={(trustLevel) => onApprove(request.id, trustLevel)}
+                    onApprove={(trustLevel, alwaysAllow, allowKind) => onApprove(request.id, trustLevel, alwaysAllow, allowKind)}
                     onSelect={() => onToggleSelection(request.id)}
                     onViewDetails={() => setSelectedRequest(request)}
                   />

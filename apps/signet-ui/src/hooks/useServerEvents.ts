@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo } from '@signet/types';
+import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse } from '@signet/types';
 
 /**
  * Server-sent event types matching the backend event-service.ts
@@ -15,6 +15,7 @@ export type ServerEvent =
   | { type: 'key:unlocked'; keyName: string }
   | { type: 'key:deleted'; keyName: string }
   | { type: 'stats:updated'; stats: DashboardStats }
+  | { type: 'relays:updated'; relays: RelayStatusResponse }
   | { type: 'ping' };
 
 export type ServerEventCallback = (event: ServerEvent) => void;

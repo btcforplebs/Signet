@@ -1,5 +1,5 @@
 import createDebug from 'debug';
-import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo } from '@signet/types';
+import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse } from '@signet/types';
 
 const debug = createDebug('signet:events');
 
@@ -16,6 +16,7 @@ export type ServerEvent =
     | { type: 'key:unlocked'; keyName: string }
     | { type: 'key:deleted'; keyName: string }
     | { type: 'stats:updated'; stats: DashboardStats }
+    | { type: 'relays:updated'; relays: RelayStatusResponse }
     | { type: 'ping' };
 
 export type EventCallback = (event: ServerEvent) => void;
@@ -121,6 +122,13 @@ export class EventService {
      */
     emitKeyDeleted(keyName: string): void {
         this.emit({ type: 'key:deleted', keyName });
+    }
+
+    /**
+     * Emit a relays:updated event
+     */
+    emitRelaysUpdated(relays: RelayStatusResponse): void {
+        this.emit({ type: 'relays:updated', relays });
     }
 }
 

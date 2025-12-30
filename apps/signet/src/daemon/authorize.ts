@@ -1,4 +1,4 @@
-import type { NDKEvent } from '@nostr-dev-kit/ndk';
+import type { Event } from 'nostr-tools/pure';
 import createDebug from 'debug';
 import prisma from '../db.js';
 import type { ConnectionManager } from './connection-manager.js';
@@ -16,7 +16,7 @@ const debug = createDebug('signet:authorize');
 
 let cachedBaseUrl: string | null | undefined;
 
-function serialiseParam(payload?: string | NDKEvent): string | undefined {
+function serialiseParam(payload?: string | Event): string | undefined {
     if (!payload) {
         return undefined;
     }
@@ -26,7 +26,7 @@ function serialiseParam(payload?: string | NDKEvent): string | undefined {
     }
 
     try {
-        return JSON.stringify(payload.rawEvent());
+        return JSON.stringify(payload);
     } catch {
         return undefined;
     }
@@ -37,7 +37,7 @@ async function persistRequest(
     requestId: string,
     remotePubkey: string,
     method: string,
-    payload?: string | NDKEvent
+    payload?: string | Event
 ) {
     const params = serialiseParam(payload);
     const record = await prisma.request.create({
@@ -201,7 +201,7 @@ export async function requestAuthorization(
     remotePubkey: string,
     requestId: string,
     method: string,
-    payload?: string | NDKEvent
+    payload?: string | Event
 ): Promise<string | undefined> {
     const record = await persistRequest(keyName, requestId, remotePubkey, method, payload);
     const baseUrl = await resolveBaseUrl(connectionManager);
@@ -214,7 +214,7 @@ export async function requestAuthorization(
 
     // Ensure relay connections are active before sending auth_url
     await connectionManager.ensureConnected();
-    connectionManager.rpc.sendResponse(requestId, remotePubkey, 'auth_url', undefined, url);
+    await connectionManager.sendResponse(requestId, remotePubkey, 'auth_url', undefined, url);
 
     return await awaitWebDecision(record.id);
 }

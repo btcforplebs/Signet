@@ -1,7 +1,8 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { FocusTrap } from 'focus-trap-react';
 import type { DisplayRequest } from '@signet/types';
-import { getEventKindLabel, getMethodInfo, getPermissionRisk } from '../../lib/event-labels.js';
+import { getKindLabel, getKindDescription, isKindSensitive } from '@signet/types';
+import { getMethodInfo, getPermissionRisk } from '../../lib/event-labels.js';
 import { CopyIcon, CloseIcon } from '../shared/Icons.js';
 import styles from './RequestDetailsModal.module.css';
 
@@ -194,8 +195,15 @@ export function RequestDetailsModal({
                 <div className={styles.eventDetails}>
                   <div className={styles.eventKind}>
                     <span className={styles.kindLabel}>Kind {eventKind}</span>
-                    <span className={styles.kindName}>{getEventKindLabel(eventKind)}</span>
+                    <span className={styles.kindName}>{getKindLabel(eventKind)}</span>
+                    {isKindSensitive(eventKind) && (
+                      <span className={styles.sensitiveWarning}>Sensitive</span>
+                    )}
                   </div>
+
+                  {getKindDescription(eventKind) && (
+                    <p className={styles.kindDescription}>{getKindDescription(eventKind)}</p>
+                  )}
 
                   {eventContent && (
                     <div className={styles.eventField}>

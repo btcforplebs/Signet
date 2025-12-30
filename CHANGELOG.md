@@ -18,6 +18,9 @@
 - **Service Layer Architecture** - `KeyService`, `RequestService`, `AppService`, `DashboardService`, `EventService`, `RelayService`
 - **Repository Layer** - Database access layer with batch query methods (eliminates N+1 queries)
 - **ACL Caching** - 30-second TTL cache for permission lookups with automatic invalidation
+- **Subscription Manager** - Automatic subscription recovery after system sleep/wake via time-jump detection and ping-based health checks
+- **Kind Names & Descriptions** - Human-readable event kind names (e.g., "Short Text Note" for kind 1) with contextual descriptions in request details
+- **Permission Request Details** - Rich preview for signing requests showing kind, content, tags; trust level breakdown during connect; "Always allow [kind]" checkbox for kind-specific permissions
 - **Config Options** - `jwtSecret`, `allowedOrigins`, `requireAuth` for security configuration
 - **Environment Variables** - Improved Docker environment variable naming with service prefixes (`SIGNET_PORT`, `SIGNET_HOST`, `EXTERNAL_URL`, `UI_PORT`, `UI_HOST`, `DAEMON_URL`); legacy names still supported
 
@@ -41,18 +44,23 @@
 - **User Model** - Removed unused email field
 - **Unused Libraries** - Removed `lib/rpc/`, `lib/bunker.ts`, `lib/nip07.ts`
 - **Dependencies** - Removed `axios`, `express`, `crypto-js`
+- **NDK Dependency** - Replaced `@nostr-dev-kit/ndk` with direct `nostr-tools` usage for smaller bundle size and simpler relay management
 
 ### Fixed
 
+- Token redemption race condition - atomic claiming prevents simultaneous redemption by multiple clients
 - nsecEncode bug where hex private keys were passed directly instead of Buffer (GitHub issue #6)
 - BigInt serialization error in `/dashboard` endpoint (SQLite COUNT returns BigInt)
 - Docker Alpine compatibility for `better-sqlite3` native module
 - Unhandled promises and swallowed errors in authorization polling
 - Database cleanup errors now logged instead of silently ignored
-- NIP-46 subscriptions not recovering after sleep/wake cycles - subscription lifecycle now managed explicitly with automatic restart on relay reconnection
+- Relay subscriptions now auto-recover after system sleep/wake cycles via `SubscriptionManager` with time-jump detection and ping-based health checks
+- Relay status in UI now updates via real-time SSE events when connections change, with 30-second polling fallback
 
 ### Security
 
+- **Timing-Safe Secret Comparison** - Admin secret validation uses constant-time comparison to prevent timing attacks
+- **Hex Input Validation** - Hex string parsing now validates input characters, preventing silent data corruption
 - **API Authentication** - All sensitive endpoints (`/keys`, `/apps`, `/connection`, `/requests`, `/dashboard`) now require JWT authentication (previously unauthenticated)
 - **Encryption Upgrade** - Migrated from AES-256-CBC to AES-256-GCM with authenticated encryption for tamper detection
 - **Key Derivation** - PBKDF2 iterations increased from 100,000 to 600,000 per NIST SP 800-132 (2023)

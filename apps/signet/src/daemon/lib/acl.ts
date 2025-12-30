@@ -1,4 +1,4 @@
-import type { NDKEvent, NostrEvent } from '@nostr-dev-kit/ndk';
+import type { Event } from 'nostr-tools/pure';
 import prisma from '../../db.js';
 import { ACL_CACHE_TTL_MS, ACL_CACHE_MAX_SIZE } from '../constants.js';
 
@@ -169,7 +169,7 @@ type SigningConditionQuery = {
     kind?: string | { in: string[] };
 };
 
-function extractKind(payload?: string | NostrEvent | NDKEvent): number | undefined {
+function extractKind(payload?: string | Event): number | undefined {
     if (!payload) {
         return undefined;
     }
@@ -186,15 +186,8 @@ function extractKind(payload?: string | NostrEvent | NDKEvent): number | undefin
         return undefined;
     }
 
-    if ('kind' in payload && typeof (payload as NostrEvent).kind === 'number') {
-        return (payload as NostrEvent).kind;
-    }
-
-    if (typeof (payload as NDKEvent).rawEvent === 'function') {
-        const raw = (payload as NDKEvent).rawEvent();
-        if (raw && typeof raw.kind === 'number') {
-            return raw.kind;
-        }
+    if ('kind' in payload && typeof payload.kind === 'number') {
+        return payload.kind;
     }
 
     return undefined;
@@ -202,7 +195,7 @@ function extractKind(payload?: string | NostrEvent | NDKEvent): number | undefin
 
 function buildConditionQuery(
     method: RpcMethod,
-    payload?: string | NostrEvent | NDKEvent
+    payload?: string | Event
 ): SigningConditionQuery {
     if (method !== 'sign_event') {
         return { method };
@@ -227,7 +220,7 @@ function buildConditionQuery(
 function shouldAutoApproveByTrustLevel(
     trustLevel: TrustLevel,
     method: RpcMethod,
-    payload?: string | NDKEvent | NostrEvent
+    payload?: string | Event
 ): boolean {
     // Paranoid: never auto-approve anything
     if (trustLevel === 'paranoid') {
@@ -267,7 +260,7 @@ export async function isRequestPermitted(
     keyName: string,
     remotePubkey: string,
     method: RpcMethod,
-    payload?: string | NDKEvent | NostrEvent
+    payload?: string | Event
 ): Promise<boolean | undefined> {
     // Try to get cached keyUser info
     let cached = getCachedEntry(keyName, remotePubkey);
