@@ -1,8 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Purple rounded rectangle background -->
   <rect width="32" height="32" rx="6" fill="#8b5cf6"/>
-  <g transform="translate(7.5, 8) scale(0.7)" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/>
-    <path d="m21 2-9.6 9.6"/>
-    <circle cx="7.5" cy="15.5" r="5.5"/>
-  </g>
+  <!-- White key icon (from Android ic_launcher_foreground, scaled and centered) -->
+  <path fill="#ffffff" transform="translate(16, 16) scale(0.28) translate(-54, -54)"
+    d="M54,30
+       C47.4,30 42,35.4 42,42
+       C42,46.8 44.4,51 48,53.4
+       L48,72
+       C48,73.1 48.9,74 50,74
+       L52,74
+       L52,78
+       L56,78
+       L56,74
+       L58,74
+       C59.1,74 60,73.1 60,72
+       L60,53.4
+       C63.6,51 66,46.8 66,42
+       C66,35.4 60.6,30 54,30
+       M54,36
+       C57.3,36 60,38.7 60,42
+       C60,45.3 57.3,48 54,48
+       C50.7,48 48,45.3 48,42
+       C48,38.7 50.7,36 54,36
+       Z"/>
 </svg>

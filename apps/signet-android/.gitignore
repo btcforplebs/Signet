@@ -1,0 +1,39 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio
+.idea/
+*.iml
+local.properties
+captures/
+
+# Kotlin
+*.class
+.kotlin/
+
+# Generated files
+app/build/
+app/release/
+*.apk
+*.aab
+
+# Native builds
+.cxx/
+.externalNativeBuild/
+
+# Signing
+*.jks
+*.keystore
+keystore.properties
+
+# Debug
+*.hprof
+
+# Zapstore
+.env
+
+# Other
+.DS_Store
+*.log

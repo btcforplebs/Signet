@@ -1,0 +1,225 @@
+package tech.geektoshi.signet
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import tech.geektoshi.signet.data.repository.SettingsRepository
+import tech.geektoshi.signet.service.SignetService
+import tech.geektoshi.signet.ui.components.BatteryOptimizationDialog
+import tech.geektoshi.signet.ui.components.LockScreen
+import tech.geektoshi.signet.ui.components.isIgnoringBatteryOptimizations
+import tech.geektoshi.signet.ui.navigation.SignetNavHost
+import tech.geektoshi.signet.ui.screens.setup.SetupScreen
+import tech.geektoshi.signet.ui.theme.SignetTheme
+import kotlinx.coroutines.launch
+
+class MainActivity : FragmentActivity() {
+
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+    }
+
+    // Track whether the app is ready (DataStore loaded)
+    private var isReady = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Install splash screen before super.onCreate()
+        val splashScreen = installSplashScreen()
+
+        // Keep native splash visible until DataStore has loaded
+        splashScreen.setKeepOnScreenCondition { !isReady }
+
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        // Request notification permission using legacy API (compatible with FragmentActivity)
+        requestNotificationPermission()
+
+        setContent {
+            val settingsRepository = remember { SettingsRepository(this) }
+            val daemonUrl by settingsRepository.daemonUrl.collectAsState(initial = null)
+
+            // Dismiss native splash once DataStore has loaded
+            LaunchedEffect(daemonUrl) {
+                if (daemonUrl != null) {
+                    isReady = true
+                }
+            }
+
+            val batteryPromptShown by settingsRepository.batteryPromptShown.collectAsState(initial = true)
+            val appLockEnabled by settingsRepository.appLockEnabled.collectAsState(initial = false)
+            val lockTimeoutMinutes by settingsRepository.lockTimeoutMinutes.collectAsState(initial = 1)
+            val scope = rememberCoroutineScope()
+
+            var showBatteryDialog by remember { mutableStateOf(false) }
+            var isUnlocked by remember { mutableStateOf(false) }
+            var backgroundTimestamp by remember { mutableLongStateOf(0L) }
+
+            // When user enables app lock while in app, consider them already unlocked
+            LaunchedEffect(appLockEnabled) {
+                if (appLockEnabled) {
+                    isUnlocked = true
+                }
+            }
+
+            // Handle lifecycle for background timeout
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner, appLockEnabled, lockTimeoutMinutes) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_PAUSE -> {
+                            backgroundTimestamp = System.currentTimeMillis()
+                        }
+                        Lifecycle.Event.ON_RESUME -> {
+                            if (appLockEnabled && isUnlocked && backgroundTimestamp > 0) {
+                                val elapsedMinutes = (System.currentTimeMillis() - backgroundTimestamp) / 60_000
+                                if (elapsedMinutes >= lockTimeoutMinutes) {
+                                    isUnlocked = false
+                                }
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
+
+            // Check if we should show battery optimization dialog
+            LaunchedEffect(daemonUrl, batteryPromptShown) {
+                if (!daemonUrl.isNullOrEmpty() &&
+                    !batteryPromptShown &&
+                    !isIgnoringBatteryOptimizations(this@MainActivity)
+                ) {
+                    showBatteryDialog = true
+                }
+            }
+
+            // Start service when URL is configured
+            LaunchedEffect(daemonUrl) {
+                if (!daemonUrl.isNullOrEmpty() && hasNotificationPermission()) {
+                    SignetService.start(this@MainActivity)
+                }
+            }
+
+            SignetTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    // Show lock screen if app lock is enabled and not unlocked
+                    val requiresUnlock = appLockEnabled && !isUnlocked && !daemonUrl.isNullOrEmpty()
+
+                    when {
+                        // Show lock screen
+                        requiresUnlock -> {
+                            LockScreen(
+                                onUnlocked = { isUnlocked = true }
+                            )
+                        }
+                        // Still loading - native splash screen handles this
+                        daemonUrl == null -> {
+                            // Empty - native splash is still visible
+                        }
+                        // No URL configured - show setup
+                        daemonUrl!!.isEmpty() -> {
+                            SetupScreen(
+                                settingsRepository = settingsRepository,
+                                onSetupComplete = {
+                                    // Start service after setup completes
+                                    if (hasNotificationPermission()) {
+                                        SignetService.start(this@MainActivity)
+                                    }
+                                }
+                            )
+                        }
+                        // URL configured - show main app
+                        else -> {
+                            SignetNavHost(settingsRepository = settingsRepository)
+                        }
+                    }
+
+                    // Battery optimization dialog (only show when unlocked)
+                    if (showBatteryDialog && !requiresUnlock) {
+                        BatteryOptimizationDialog(
+                            onDismiss = {
+                                showBatteryDialog = false
+                                scope.launch {
+                                    settingsRepository.setBatteryPromptShown(true)
+                                }
+                            },
+                            onOpenSettings = {
+                                showBatteryDialog = false
+                                scope.launch {
+                                    settingsRepository.setBatteryPromptShown(true)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted - service will be started by LaunchedEffect when URL is set
+            }
+        }
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+}

@@ -77,6 +77,8 @@ State-changing API endpoints are protected against Cross-Site Request Forgery us
 
 Protected methods: POST, PUT, DELETE, PATCH
 
+**Bearer Token Exemption**: API clients using Bearer token authentication (`Authorization: Bearer <token>`) are exempt from CSRF protection. This is secure because CSRF attacks exploit the browser's automatic cookie sending behavior, which doesn't apply to Bearer tokens that must be explicitly included by the client.
+
 The following endpoints require CSRF tokens:
 - `POST /keys` - Create new keys
 - `POST /keys/:name/unlock` - Unlock encrypted keys

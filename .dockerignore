@@ -60,3 +60,6 @@ docker-compose*.yml
 *.tar.gz
 *.zip
 tmp/
+
+# Android app (not used in Docker builds)
+apps/signet-android/

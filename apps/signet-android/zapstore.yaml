@@ -1,0 +1,36 @@
+repository: https://github.com/Letdown2491/signet
+
+assets:
+  - .*\.apk$
+
+name: Signet
+summary: NIP-46 remote signer for Nostr
+
+description: |
+  Signet is a NIP-46 remote signer that keeps your Nostr private keys
+  secure on your own server. Approve signing requests from any
+  connected app via the web dashboard or native Android app.
+
+  Features:
+  - Trust levels for fine-grained permission control
+  - Real-time notifications for signing requests
+  - AES-256-GCM key encryption at rest
+  - Works with any NIP-46 compatible client
+
+license: MIT
+
+icon: https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/icon.png
+
+images:
+  - https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/signet-android-1-home.png
+  - https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/signet-android-2-apps.png
+  - https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/signet-android-3-settings.png
+
+tags:
+  - nostr
+  - signer
+  - nip-46
+  - security
+  - keys
+  - privacy
+  - self-hosted

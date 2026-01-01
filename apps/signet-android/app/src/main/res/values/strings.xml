@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Signet</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_activity">Activity</string>
+    <string name="nav_apps">Apps</string>
+    <string name="nav_keys">Keys</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home Screen -->
+    <string name="pending_requests">Pending Requests</string>
+    <string name="no_pending_requests">No pending requests</string>
+    <string name="recent_activity">Recent Activity</string>
+
+    <!-- Connection -->
+    <string name="connecting">Connecting...</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connection_error">Cannot connect to daemon</string>
+    <string name="retry">Retry</string>
+
+    <!-- Settings -->
+    <string name="daemon_url">Daemon URL</string>
+    <string name="daemon_url_hint">https://signet.example.ts.net</string>
+    <string name="save">Save</string>
+
+    <!-- Service -->
+    <string name="notification_channel_name">Signet Service</string>
+    <string name="notification_channel_description">Background connection status</string>
+    <string name="notification_title">Signet</string>
+    <string name="notification_text_connected">Connected - %d pending</string>
+    <string name="notification_text_no_pending">Connected - no pending requests</string>
+    <string name="notification_text_disconnected">Disconnected</string>
+    <string name="notification_text_connecting">Connecting...</string>
+
+    <!-- Alert notifications -->
+    <string name="alert_channel_name">Signing Requests</string>
+    <string name="alert_channel_description">Alerts for new pending signing requests</string>
+    <string name="alert_new_request_title">New Signing Request</string>
+    <string name="alert_new_request_text">%1$s wants to %2$s</string>
+    <string name="alert_new_request_text_unknown">New request from %1$s</string>
+</resources>

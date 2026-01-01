@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Key icon - centered in the 108x108 viewport with 18dp inset for adaptive icon safe zone -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30
+            C47.4,30 42,35.4 42,42
+            C42,46.8 44.4,51 48,53.4
+            L48,72
+            C48,73.1 48.9,74 50,74
+            L52,74
+            L52,78
+            L56,78
+            L56,74
+            L58,74
+            C59.1,74 60,73.1 60,72
+            L60,53.4
+            C63.6,51 66,46.8 66,42
+            C66,35.4 60.6,30 54,30
+            M54,36
+            C57.3,36 60,38.7 60,42
+            C60,45.3 57.3,48 54,48
+            C50.7,48 48,45.3 48,42
+            C48,38.7 50.7,36 54,36
+            Z"/>
+</vector>

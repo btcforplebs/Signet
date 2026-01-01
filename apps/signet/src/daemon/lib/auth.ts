@@ -162,6 +162,11 @@ export function clearCsrfCookie(reply: FastifyReply): void {
  * Create CSRF protection middleware.
  * Validates that state-changing requests (POST, PUT, DELETE, PATCH) include
  * a valid CSRF token in the X-CSRF-Token header that matches the cookie.
+ *
+ * CSRF protection is skipped for Bearer token auth since CSRF attacks only
+ * apply to cookie-based auth (where credentials are sent automatically).
+ * Bearer tokens must be explicitly included by the client, so they're not
+ * vulnerable to cross-site request forgery.
  */
 export function createCsrfMiddleware() {
     return async function csrfMiddleware(
@@ -171,6 +176,12 @@ export function createCsrfMiddleware() {
         // Only check state-changing methods
         const method = request.method.toUpperCase();
         if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+            return;
+        }
+
+        // Skip CSRF for Bearer token auth - not vulnerable to CSRF attacks
+        const authHeader = request.headers.authorization;
+        if (authHeader?.startsWith('Bearer ')) {
             return;
         }
 

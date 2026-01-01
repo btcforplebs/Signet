@@ -514,6 +514,33 @@ export async function updateTrustLevel(
         select: { keyName: true, userPubkey: true },
     });
 
+    // When downgrading from full trust, remove explicit permissions that were
+    // auto-granted. These would otherwise bypass trust level checks.
+    if (trustLevel === 'paranoid' || trustLevel === 'reasonable') {
+        // Remove sign_event with kind 'all' (granted at full trust)
+        await prisma.signingCondition.deleteMany({
+            where: {
+                keyUserId,
+                method: 'sign_event',
+                kind: 'all',
+                allowed: true,
+            },
+        });
+    }
+
+    if (trustLevel === 'paranoid') {
+        // Also remove NIP-04/NIP-44 encrypt/decrypt permissions (granted at full trust)
+        await prisma.signingCondition.deleteMany({
+            where: {
+                keyUserId,
+                method: {
+                    in: ['nip04_encrypt', 'nip04_decrypt', 'nip44_encrypt', 'nip44_decrypt'],
+                },
+                allowed: true,
+            },
+        });
+    }
+
     // If upgrading to full trust, add encrypt/decrypt permissions for NIP-04
     // (NIP-44 is already auto-approved at reasonable trust)
     if (trustLevel === 'full') {
@@ -527,6 +554,7 @@ export async function updateTrustLevel(
                     { keyUserId, allowed: true, method: 'nip04_decrypt' },
                     { keyUserId, allowed: true, method: 'nip44_encrypt' },
                     { keyUserId, allowed: true, method: 'nip44_decrypt' },
+                    { keyUserId, allowed: true, method: 'sign_event', kind: 'all' },
                 ],
             });
         }

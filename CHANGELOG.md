@@ -1,8 +1,9 @@
 # Changelog
 
-## [1.0.0-beta]
+## [1.0.0]
 
 ### Added
+- Native Android app for mobile key management
 - App names displayed throughout UI instead of truncated npubs
 - Auto-approved requests now logged and visible in Activity feed
 - All NIP-46 events (sign_event, nip04/nip44 encrypt/decrypt) now appear in Activity
@@ -21,6 +22,7 @@
 - Default trust level setting for new app connections
 
 ### Changed
+- CSRF protection now skipped for Bearer token authentication (API clients using `Authorization: Bearer` header no longer need CSRF tokens)
 - Complete UI redesign with dark theme and sidebar navigation
 - WCAG 2.1 AA accessibility compliance
 - Connect flow now always requires manual approval with trust level selection
@@ -41,6 +43,7 @@
 - Pending count excludes expired requests
 - Various race conditions and error handling improvements
 - All approved requests now logged to Activity (not just trust-level auto-approvals)
+- Trust level changes now properly enforced: downgrading from "full" removes explicit permissions that would bypass trust level checks
 
 ### Security
 - JWT authentication required for all sensitive endpoints

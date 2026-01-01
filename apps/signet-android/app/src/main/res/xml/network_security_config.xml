@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for Signet
+
+    This app is designed to connect to a Signet daemon running on a
+    Tailscale network. Tailscale provides transport-layer encryption
+    via WireGuard, so cleartext HTTP is permitted.
+
+    The daemon does not support HTTPS directly - it's designed to run
+    on trusted networks (Tailscale) or behind a reverse proxy.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

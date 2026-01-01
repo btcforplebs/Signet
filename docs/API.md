@@ -17,11 +17,13 @@ Most endpoints require JWT authentication. The token is stored in an HTTP-only c
 | Header | Required | Description |
 |--------|----------|-------------|
 | `Authorization` | Optional | Bearer token (alternative to cookie) |
-| `X-CSRF-Token` | For mutations | CSRF token for POST/PATCH/DELETE requests |
+| `X-CSRF-Token` | For mutations | CSRF token for POST/PATCH/DELETE requests (not required when using Bearer auth) |
 
 ### Getting a CSRF Token
 
-Before making state-changing requests, fetch a CSRF token:
+**Note:** CSRF tokens are only required when authenticating via cookies (browser-based access). API clients using Bearer token authentication (`Authorization: Bearer <token>`) do not need CSRF tokens, as Bearer auth is not vulnerable to cross-site request forgery attacks.
+
+Before making state-changing requests with cookie auth, fetch a CSRF token:
 
 ```bash
 curl -c cookies.txt http://localhost:3000/csrf-token

@@ -13,16 +13,16 @@ A modern NIP-46 remote signer for Nostr. Manages multiple keys securely with a w
 git clone https://github.com/Letdown2491/signet
 cd signet
 pnpm install
+# If you plan to run the daemon with the web dashboard
 docker compose up --build
+# Or if you plan to run the daemon with the Android app
+docker compose up --build signet
 ```
 
-This launches:
-- Daemon + REST API on `http://localhost:3000`
-- Web dashboard on `http://localhost:4174`
+- Daemon + REST API will run on `http://localhost:3000`
+- Web dashboard will run on `http://localhost:4174`. The web dashboard is not required if you plan to manage Signet using the Android app.
 
-> **Note:** Signet is designed for self-hosters on trusted networks (Tailscale, Wireguard, local LAN). There is no login page - access control is handled at the network layer. Public internet deployment with authentication is planned for a future release.
-
-Add keys via CLI (optional) or through the web UI (simpler):
+If you prefer to add keys directly through the CLI:
 
 ```bash
 docker compose run --rm signet add --name main-key
@@ -53,20 +53,20 @@ Optionally, you could add keys and start the daemon from the CLI with a specific
 cd apps/signet
 pnpm run build
 pnpm run prisma:migrate
-# Add a key via CLI (prompts for passphrase and nsec)
+# Add a key via CLI (prompts for passphrase and nsec, optional if using web dashboard or Android app)
 pnpm run signet add --name main-key
-# Start with a key already unlocked (prompts for passphrase)
+# Start with a key already unlocked (prompts for passphrase, optional if using web dashboard or Android app)
 pnpm run signet start --key main-key
 ```
 
-Start the UI dev server (in a separate terminal):
+Start the UI dev server (in a separate terminal, optional if using Android app):
 
 ```bash
 cd apps/signet-ui
 pnpm run dev
 ```
 
-Open `http://localhost:4174` to access the dashboard. From there you can add keys, connect apps, and manage signing requests.
+Open `http://localhost:4174` to access the dashboard. From there you can add keys, connect apps, and manage signing requests. Note that this is not required if you plan to manage keys and signing approvals via the Android app.
 
 ## Configuration
 
@@ -86,3 +86,4 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the full security model.
 - [Deployment Guide](docs/DEPLOYMENT.md) - Tailscale, reverse proxies, etc.
 - [Security Model](docs/SECURITY.md) - Security architecture and threat model
 - [API Reference](docs/API.md) - REST API endpoints
+- [Android App](docs/ANDROID.md) - Setup and building the mobile app
