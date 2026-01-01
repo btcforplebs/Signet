@@ -1,6 +1,8 @@
 # Signet
 
-A modern NIP-46 remote signer for Nostr. Manages multiple keys securely with a web dashboard for administration. This project was originally forked from [nsecbunkerd](https://github.com/kind-0/nsecbunkerd), but has since received an extensive rewrite.
+A modern NIP-46 remote signer for Nostr. Manages multiple keys securely with a web dashboard for administration. This project was originally forked from [nsecbunkerd](https://github.com/kind-0/nsecbunkerd), but has since received an extensive rewrite. 
+
+An Android app is [available on ZapStore](https://zapstore.dev/apps/naddr1qvzqqqr7pvpzpk4yr0kmdpv3xcalgsrldp7tj7yuc4p76qjtka7z95kgfky02s2nqq2hgetrdqhxwet9dd6x7umgdyh8x6t8dejhgck8a3z). This app is just a frontend, so running the daemon is still required. DO NOT run the daemon on a public machine. The preferred method is to run it on a machine sitting on a private network. Tailscale is preferred and documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). 
 
 ## Screenshots
 

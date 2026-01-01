@@ -20,17 +20,3 @@ description: |
 license: MIT
 
 icon: https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/icon.png
-
-images:
-  - https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/signet-android-1-home.png
-  - https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/signet-android-2-apps.png
-  - https://raw.githubusercontent.com/Letdown2491/signet/main/apps/signet-android/app/images/signet-android-3-settings.png
-
-tags:
-  - nostr
-  - signer
-  - nip-46
-  - security
-  - keys
-  - privacy
-  - self-hosted
