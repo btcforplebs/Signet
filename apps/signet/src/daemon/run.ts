@@ -360,7 +360,7 @@ class Daemon {
     private async startWebAuth(): Promise<void> {
         // Support both new (SIGNET_*) and legacy (AUTH_*) env var names
         const portEnv = process.env.SIGNET_PORT ?? process.env.AUTH_PORT;
-        const authPort = this.config.authPort ?? (portEnv ? parseInt(portEnv, 10) : undefined);
+        const authPort = (portEnv ? parseInt(portEnv, 10) : undefined) ?? this.config.authPort;
         if (!authPort) {
             console.log('No authPort configured, HTTP server disabled');
             return;
