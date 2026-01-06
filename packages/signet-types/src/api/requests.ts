@@ -1,3 +1,5 @@
+import type { ApprovalType } from './dashboard.js';
+
 /**
  * Preview of an event being signed
  */
@@ -23,6 +25,7 @@ export interface PendingRequest {
     requiresPassword: boolean;
     processedAt?: string | null;
     autoApproved: boolean;
+    approvalType?: ApprovalType;
     /** App name from KeyUser.description, if available */
     appName?: string | null;
     /** Whether the request was allowed (true=approved, false=denied, null=pending/expired) */

@@ -5,3 +5,4 @@ export { DashboardService, type DashboardServiceConfig, type DashboardData, getD
 export { RelayService } from './relay-service.js';
 export { PublishLogger } from './publish-logger.js';
 export { EventService, getEventService, setEventService, emitCurrentStats, type ServerEvent, type EventCallback } from './event-service.js';
+export { ConnectionTokenService, getConnectionTokenService, setConnectionTokenService, type ConnectionTokenResult } from './connection-token-service.js';

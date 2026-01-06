@@ -17,6 +17,7 @@ export type ServerEvent =
   | { type: 'app:updated'; app: ConnectedApp }
   | { type: 'key:created'; key: KeyInfo }
   | { type: 'key:unlocked'; keyName: string }
+  | { type: 'key:locked'; keyName: string }
   | { type: 'key:deleted'; keyName: string }
   | { type: 'key:renamed'; oldName: string; newName: string }
   | { type: 'key:updated'; keyName: string }

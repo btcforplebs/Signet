@@ -471,7 +471,15 @@ private fun ActivityCard(activity: ActivityEntry) {
                     color = TextPrimary
                 )
                 StatusBadge(
-                    status = if (activity.type == "approval") BadgeStatus.APPROVED else BadgeStatus.DENIED
+                    status = when {
+                        activity.type == "denial" -> BadgeStatus.DENIED
+                        activity.approvalType == "manual" -> BadgeStatus.APPROVED
+                        activity.approvalType == "auto_trust" -> BadgeStatus.AUTO_TRUST
+                        activity.approvalType == "auto_permission" -> BadgeStatus.AUTO_PERMISSION
+                        activity.autoApproved -> BadgeStatus.AUTO_APPROVED  // Backwards compat
+                        activity.type == "approval" -> BadgeStatus.APPROVED
+                        else -> BadgeStatus.APPROVED
+                    }
                 )
             }
 

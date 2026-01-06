@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ActivityEntry } from '@signet/types';
 import { getMethodLabelPastTense } from '@signet/types';
-import { Clock, ChevronRight, Check, X, Activity } from 'lucide-react';
+import { Clock, ChevronRight, Check, X, Activity, Shield, Repeat } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/formatters.js';
 import styles from './HomeView.module.css';
 
@@ -60,12 +60,24 @@ export function RecentActivityFeed({
                   {entry.keyName && <span className={styles.activityKeyName}> • {entry.keyName}</span>}
                 </span>
                 <span className={styles.statusBadge}>
-                  {entry.autoApproved ? (
+                  {entry.type === 'denial' ? (
+                    <span className={styles.badgeDenied}>Denied</span>
+                  ) : entry.approvalType === 'manual' ? (
+                    <span className={styles.badgeApproved} title="Manually approved by you">
+                      <Check size={12} /> Approved
+                    </span>
+                  ) : entry.approvalType === 'auto_trust' ? (
+                    <span className={styles.badgeAuto} title="Auto-approved by app's trust level">
+                      <Shield size={12} /> Approved
+                    </span>
+                  ) : entry.approvalType === 'auto_permission' ? (
+                    <span className={styles.badgeAuto} title="Auto-approved by saved permission">
+                      <Repeat size={12} /> Approved
+                    </span>
+                  ) : entry.autoApproved ? (
                     <span className={styles.badgeAuto}>Auto Approved</span>
                   ) : entry.type === 'approval' ? (
                     <span className={styles.badgeApproved}>Approved</span>
-                  ) : entry.type === 'denial' ? (
-                    <span className={styles.badgeDenied}>Denied</span>
                   ) : null}
                 </span>
               </div>

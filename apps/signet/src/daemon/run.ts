@@ -7,7 +7,7 @@ import { SubscriptionManager } from './lib/subscription-manager.js';
 import { printServerInfo } from './lib/network.js';
 import { requestAuthorization } from './authorize.js';
 import type { DaemonBootstrapConfig } from './types.js';
-import { checkRequestPermission, type RpcMethod } from './lib/acl.js';
+import { checkRequestPermission, type RpcMethod, type ApprovalType } from './lib/acl.js';
 import {
     KeyService,
     RequestService,
@@ -20,15 +20,45 @@ import {
     getEventService,
     setDashboardService,
     emitCurrentStats,
+    getConnectionTokenService,
 } from './services/index.js';
 import { requestRepository, logRepository } from './repositories/index.js';
 import { HttpServer } from './http/server.js';
 import prisma from '../db.js';
 
+// ============================================================================
+// Global Error Handlers
+// ============================================================================
+// Catch unhandled errors to prevent silent crashes and provide visibility
+
+process.on('uncaughtException', (error: Error) => {
+    console.error('=== UNCAUGHT EXCEPTION ===');
+    console.error('Time:', new Date().toISOString());
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('==========================');
+    // Don't exit - let the process continue if possible
+    // The error is logged and we can investigate
+});
+
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+    console.error('=== UNHANDLED REJECTION ===');
+    console.error('Time:', new Date().toISOString());
+    console.error('Reason:', reason);
+    if (reason instanceof Error) {
+        console.error('Stack:', reason.stack);
+    }
+    console.error('===========================');
+    // Don't exit - just log for investigation
+});
+
 // Cleanup constants
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const REQUEST_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LOG_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// Health monitoring constants
+const HEALTH_LOG_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 // Rate limiting for auto-approval logging: 1 log per method per 5 seconds per app
 const AUTO_APPROVAL_LOG_INTERVAL_MS = 5 * 1000; // 5 seconds
@@ -73,7 +103,7 @@ function buildAuthorizationCallback(
             if (result.permitted && result.keyUserId) {
                 if (shouldLogAutoApproval(result.keyUserId, method)) {
                     // Log asynchronously to avoid blocking
-                    logAutoApproval(result.keyUserId, method, primaryParam, keyName, id, pubkey, result.autoApproved).catch(err => {
+                    logAutoApproval(result.keyUserId, method, primaryParam, keyName, id, pubkey, result.autoApproved, result.approvalType).catch(err => {
                         console.error('Failed to log auto-approval:', err);
                     });
                 }
@@ -100,7 +130,8 @@ async function logAutoApproval(
     keyName: string,
     requestId: string,
     remotePubkey: string,
-    autoApproved: boolean
+    autoApproved: boolean,
+    approvalType?: ApprovalType
 ): Promise<void> {
     // Fetch KeyUser info for the activity entry
     const keyUser = await prisma.keyUser.findUnique({
@@ -132,6 +163,7 @@ async function logAutoApproval(
         remotePubkey,
         params: paramsStr,
         keyUserId,
+        approvalType,
     });
 
     // Create log entry
@@ -141,6 +173,7 @@ async function logAutoApproval(
         params: paramsStr,
         keyUserId,
         autoApproved,
+        approvalType,
     });
 
     // Emit SSE event
@@ -155,6 +188,7 @@ async function logAutoApproval(
         userPubkey: keyUser?.userPubkey,
         appName: keyUser?.description ?? undefined,
         autoApproved,
+        approvalType,
     });
 
     // Emit stats update (activity count changed)
@@ -250,6 +284,11 @@ class Daemon {
             await this.startKey(keyName, secret);
         });
 
+        // Wire up callback to stop bunker backend when keys are locked via HTTP
+        this.keyService.setOnKeyLocked((keyName: string) => {
+            this.stopKey(keyName);
+        });
+
         await this.startConfiguredKeys();
         await this.loadPlainKeys();
         this.startCleanupTasks();
@@ -264,6 +303,33 @@ class Daemon {
         setInterval(() => {
             this.runCleanup();
         }, CLEANUP_INTERVAL_MS);
+
+        // Schedule periodic health logging
+        setInterval(() => {
+            this.logHealthStatus();
+        }, HEALTH_LOG_INTERVAL_MS);
+
+        // Log initial health status after a short delay
+        setTimeout(() => {
+            this.logHealthStatus();
+        }, 30000); // 30 seconds after startup
+    }
+
+    private logHealthStatus(): void {
+        const mem = process.memoryUsage();
+        const uptime = process.uptime();
+        const uptimeHours = Math.floor(uptime / 3600);
+        const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+
+        console.log('=== HEALTH STATUS ===');
+        console.log(`Time: ${new Date().toISOString()}`);
+        console.log(`Uptime: ${uptimeHours}h ${uptimeMinutes}m`);
+        console.log(`Memory: ${Math.round(mem.heapUsed / 1024 / 1024)}MB heap, ${Math.round(mem.rss / 1024 / 1024)}MB RSS`);
+        console.log(`SSE clients: ${this.eventService.getSubscriberCount()}`);
+        console.log(`Relay connections: ${this.pool.getConnectedCount()}/${this.pool.getRelays().length}`);
+        console.log(`Active keys: ${this.backends.size}`);
+        console.log(`Managed subscriptions: ${this.subscriptionManager.getSubscriptionCount()}`);
+        console.log('====================');
     }
 
     private async runCleanup(): Promise<void> {
@@ -291,6 +357,17 @@ class Daemon {
             }
         } catch (error) {
             console.error('Failed to cleanup old logs:', error);
+        }
+
+        // Cleanup expired connection tokens
+        try {
+            const tokenService = getConnectionTokenService();
+            const deletedTokens = await tokenService.cleanupExpiredTokens();
+            if (deletedTokens > 0) {
+                console.log(`Cleaned up ${deletedTokens} expired connection token(s)`);
+            }
+        } catch (error) {
+            console.error('Failed to cleanup connection tokens:', error);
         }
 
         // Emit stats update if anything changed
@@ -354,6 +431,15 @@ class Daemon {
             console.log(`Key "${name}" online.`);
         } catch (error) {
             console.log(`Failed to start key ${name}: ${(error as Error).message}`);
+        }
+    }
+
+    private stopKey(name: string): void {
+        const backend = this.backends.get(name);
+        if (backend) {
+            backend.stop();
+            this.backends.delete(name);
+            console.log(`Key "${name}" locked.`);
         }
     }
 

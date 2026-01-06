@@ -8,6 +8,7 @@ import { bytesToHex } from './lib/hex.js';
 import prisma from '../db.js';
 import type { RelayPool } from './lib/relay-pool.js';
 import type { SubscriptionManager } from './lib/subscription-manager.js';
+import { getConnectionTokenService } from './services/index.js';
 
 const debug = createDebug('signet:nip46');
 
@@ -234,6 +235,7 @@ export class Nip46Backend {
 
     /**
      * Handle connect request with secret validation.
+     * Validates against one-time connection tokens first, then falls back to admin secret.
      * Secret validates the connection attempt but does NOT auto-approve.
      * User must still approve and select trust level via the UI.
      */
@@ -243,20 +245,32 @@ export class Nip46Backend {
         remotePubkey: string
     ): Promise<string | undefined> {
         const providedSecret = params[1];
-        const expectedSecret = this.adminSecret;
         const humanPubkey = npubEncode(remotePubkey);
 
-        // If admin secret is configured and client provided a secret, validate it
-        // Invalid secrets are silently dropped (security measure to prevent enumeration)
-        if (expectedSecret && providedSecret) {
-            const secretsMatch = providedSecret.length === expectedSecret.length &&
-                crypto.timingSafeEqual(Buffer.from(providedSecret), Buffer.from(expectedSecret));
-            if (!secretsMatch) {
-                debug('[%s] connect with invalid secret from %s', this.keyName, humanPubkey);
-                return undefined; // Silent rejection - no response sent
+        if (providedSecret) {
+            // First, try to validate as a one-time connection token
+            const tokenService = getConnectionTokenService();
+            const tokenValid = await tokenService.validateAndRedeemToken(providedSecret, this.keyName);
+
+            if (tokenValid) {
+                debug('[%s] connect with valid one-time token from %s', this.keyName, humanPubkey);
+            } else if (this.adminSecret) {
+                // Fallback: check against persistent admin secret
+                const secretsMatch = providedSecret.length === this.adminSecret.length &&
+                    crypto.timingSafeEqual(Buffer.from(providedSecret), Buffer.from(this.adminSecret));
+
+                if (!secretsMatch) {
+                    debug('[%s] connect with invalid secret from %s', this.keyName, humanPubkey);
+                    return undefined; // Silent rejection - no response sent
+                }
+                debug('[%s] connect with valid admin secret from %s', this.keyName, humanPubkey);
+            } else {
+                // No admin secret configured and token was invalid
+                debug('[%s] connect with invalid token from %s (no admin secret fallback)', this.keyName, humanPubkey);
+                return undefined; // Silent rejection
             }
-            debug('[%s] connect with valid secret from %s, proceeding to approval', this.keyName, humanPubkey);
         }
+        // If no secret provided, proceed to approval flow (existing behavior)
 
         // All connect requests go through the normal approval flow
         // This allows the user to see the request and select a trust level

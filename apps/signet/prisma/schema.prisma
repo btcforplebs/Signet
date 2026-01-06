@@ -18,6 +18,7 @@ model Request {
     params        String?
     allowed       Boolean?
     autoApproved  Boolean   @default(false)
+    approvalType  String?   // 'manual' | 'auto_trust' | 'auto_permission'
     keyUserId     Int?
     KeyUser       KeyUser?  @relation(fields: [keyUserId], references: [id])
 
@@ -33,6 +34,8 @@ model KeyUser {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @default(now()) @updatedAt
   revokedAt         DateTime?
+  suspendedAt       DateTime?          // When set, app is suspended and all requests are denied
+  suspendUntil      DateTime?          // If set, app auto-resumes after this time
   lastUsedAt        DateTime?
   description       String?
   trustLevel        String             @default("reasonable") // 'paranoid' | 'reasonable' | 'full'
@@ -43,6 +46,7 @@ model KeyUser {
 
   @@unique([keyName, userPubkey], name: "unique_key_user")
   @@index([revokedAt])
+  @@index([suspendedAt])
 }
 
 model Key {
@@ -75,6 +79,7 @@ model Log {
   params       String?
   keyUserId    Int?
   autoApproved Boolean  @default(false)
+  approvalType String?  // 'manual' | 'auto_trust' | 'auto_permission'
   keyName      String?  // Direct storage for denials (no KeyUser)
   remotePubkey String?  // Direct storage for denials (no KeyUser)
   KeyUser      KeyUser? @relation(fields: [keyUserId], references: [id])
@@ -122,4 +127,16 @@ model Token {
   KeyUser    KeyUser?  @relation(fields: [keyUserId], references: [id])
 
   @@index([keyName])
+}
+
+model ConnectionToken {
+  id         Int       @id @default(autoincrement())
+  keyName    String
+  token      String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  redeemedAt DateTime?
+
+  @@index([keyName])
+  @@index([token])
 }

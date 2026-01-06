@@ -27,7 +27,8 @@ data class ActivityEntry(
     val keyName: String? = null,
     val userPubkey: String? = null,
     val appName: String? = null,
-    val autoApproved: Boolean
+    val autoApproved: Boolean,
+    val approvalType: String? = null  // 'manual' | 'auto_trust' | 'auto_permission'
 )
 
 /**
@@ -66,6 +67,7 @@ data class PendingRequest(
     val requiresPassword: Boolean = false,
     val processedAt: String? = null,
     val autoApproved: Boolean,
+    val approvalType: String? = null,  // 'manual' | 'auto_trust' | 'auto_permission'
     val appName: String? = null,
     val allowed: Boolean? = null
 )
@@ -91,6 +93,7 @@ enum class KeyStatus {
 @Serializable
 data class KeyInfo(
     val name: String,
+    val pubkey: String? = null,
     val npub: String? = null,
     val bunkerUri: String? = null,
     val status: String,
@@ -144,7 +147,17 @@ data class ConnectedApp(
     val connectedAt: String,
     val lastUsedAt: String? = null,
     val requestCount: Int,
-    val methodBreakdown: MethodBreakdown
+    val methodBreakdown: MethodBreakdown,
+    val suspendedAt: String? = null,
+    val suspendUntil: String? = null
+)
+
+/**
+ * Request body for suspending an app with optional end time
+ */
+@Serializable
+data class SuspendAppBody(
+    val until: String? = null
 )
 
 /**
@@ -194,4 +207,15 @@ data class ApproveRequestBody(
     val alwaysAllow: Boolean? = null,
     val appName: String? = null,
     val passphrase: String? = null
+)
+
+/**
+ * Response from generating a one-time connection token
+ */
+@Serializable
+data class ConnectionTokenResponse(
+    val ok: Boolean = false,
+    val bunkerUri: String? = null,
+    val expiresAt: String? = null,
+    val error: String? = null
 )

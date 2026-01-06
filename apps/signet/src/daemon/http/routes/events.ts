@@ -61,12 +61,33 @@ export function registerEventsRoutes(
             }
         }, 15000);
 
-        // Cleanup on client disconnect
-        request.raw.on('close', () => {
-            debug('SSE client disconnected');
+        // Cleanup function to ensure resources are freed
+        let cleanedUp = false;
+        const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            debug('SSE client cleanup triggered');
             clearInterval(keepAliveInterval);
             unsubscribe();
             debug('Remaining subscribers: %d', config.eventService.getSubscriberCount());
+        };
+
+        // Cleanup on client disconnect
+        request.raw.on('close', () => {
+            debug('SSE client disconnected (close event)');
+            cleanup();
+        });
+
+        // Cleanup on error
+        request.raw.on('error', (error) => {
+            debug('SSE client error: %o', error);
+            cleanup();
+        });
+
+        // Cleanup on socket end
+        reply.raw.on('close', () => {
+            debug('SSE response closed');
+            cleanup();
         });
 
         // Don't return anything - keep the connection open

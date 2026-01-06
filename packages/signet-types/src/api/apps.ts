@@ -28,6 +28,8 @@ export interface ConnectedApp {
     permissions: string[];
     connectedAt: string;
     lastUsedAt: string | null;
+    suspendedAt: string | null;
+    suspendUntil: string | null;
     requestCount: number;
     methodBreakdown: MethodBreakdown;
 }

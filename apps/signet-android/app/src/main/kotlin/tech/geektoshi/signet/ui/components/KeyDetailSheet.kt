@@ -17,8 +17,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,12 +71,24 @@ fun KeyDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
+    var isLocking by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showUnlock by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
+    var showBunkerURISheet by remember { mutableStateOf(false) }
 
     val isLocked = key.status.lowercase() == "locked"
+    val isOnline = key.status.lowercase() == "online"
+
+    // Bunker URI Sheet
+    if (showBunkerURISheet && key.npub != null) {
+        BunkerURISheet(
+            keyName = key.name,
+            daemonUrl = daemonUrl,
+            onDismiss = { showBunkerURISheet = false }
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -125,12 +141,11 @@ fun KeyDetailSheet(
                 )
             }
 
-            // Bunker URI section
-            if (key.bunkerUri != null) {
-                CopyableField(
-                    label = "Bunker URI",
-                    value = key.bunkerUri,
-                    context = context
+            // Bunker URI section (only for online keys)
+            if (isOnline && key.pubkey != null) {
+                BunkerURIField(
+                    pubkey = key.pubkey,
+                    onClick = { showBunkerURISheet = true }
                 )
             }
 
@@ -189,6 +204,7 @@ fun KeyDetailSheet(
                         placeholder = { Text("Enter passphrase") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SignetPurple,
@@ -264,6 +280,56 @@ fun KeyDetailSheet(
                 }
             }
 
+            // Lock button for online encrypted keys
+            if (isOnline && key.isEncrypted && !showDeleteConfirm) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            isLocking = true
+                            error = null
+                            try {
+                                val client = SignetApiClient(daemonUrl)
+                                val result = client.lockKey(key.name)
+                                client.close()
+                                if (result.ok) {
+                                    onActionComplete()
+                                    onDismiss()
+                                } else {
+                                    error = result.error ?: "Failed to lock"
+                                }
+                            } catch (e: Exception) {
+                                error = e.message ?: "Failed to lock"
+                            } finally {
+                                isLocking = false
+                            }
+                        }
+                    },
+                    enabled = !isLocking && !isLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Warning
+                    )
+                ) {
+                    if (isLocking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Warning,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = if (isLocking) "Locking..." else "Lock Key",
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+
             // Delete confirmation
             if (showDeleteConfirm) {
                 Text(
@@ -279,6 +345,7 @@ fun KeyDetailSheet(
                         placeholder = { Text("Enter passphrase to confirm") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Danger,
@@ -412,6 +479,45 @@ private fun CopyableField(
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
                     contentDescription = "Copy",
+                    tint = SignetPurple,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BunkerURIField(
+    pubkey: String,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "Bunker URI",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextMuted
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "bunker://${pubkey.take(16)}...",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = Icons.Default.QrCode,
+                    contentDescription = "Show QR code",
                     tint = SignetPurple,
                     modifier = Modifier.size(20.dp)
                 )

@@ -130,6 +130,39 @@ All secrets (JWT secret, admin secret) are generated using Node.js `crypto.rando
 - **Length**: 32 bytes (256 bits)
 - **Encoding**: Hexadecimal (64 characters)
 
+## One-Time Connection Tokens
+
+When sharing a bunker URI to connect a new application, Signet generates one-time tokens instead of exposing the persistent `admin.secret`.
+
+### How It Works
+
+1. **Token Generation**: When you click "Generate bunker URI" in the UI (web or Android), Signet creates a fresh 32-byte random token
+2. **Short Expiry**: Tokens expire after 5 minutes
+3. **Single Use**: Tokens are atomically redeemed on first use—a second connection attempt with the same token will fail
+4. **Session Persistence**: Once a client successfully connects, their pubkey is stored in the database. Future requests are identified by pubkey, not the token
+
+### Security Benefits
+
+- **No persistent secret exposure**: The `admin.secret` is never shown in the UI
+- **Limited window**: Even if a bunker URI is intercepted, the attacker has only 5 minutes to use it
+- **No replay**: Using the same token twice is impossible due to atomic redemption
+- **Backwards compatible**: Existing connections using `admin.secret` continue to work
+
+### Implementation Details
+
+- **Token storage**: `ConnectionToken` table in SQLite with `keyName`, `token`, `expiresAt`, `redeemedAt`
+- **Atomic redemption**: Uses database `updateMany` with `redeemedAt: null` condition to prevent race conditions
+- **Cleanup**: Expired tokens are automatically deleted hourly
+- **Validation order**: One-time tokens are checked first, then `admin.secret` as fallback
+
+### Fallback Behavior
+
+The persistent `admin.secret` (configured in `signet.json`) still works for backwards compatibility:
+
+- Clients that already have a bunker URI with `admin.secret` can still connect
+- If a one-time token is invalid or expired, Signet falls back to checking `admin.secret`
+- New connections via the UI always use one-time tokens
+
 ## Threat Model
 
 ### What Signet protects against

@@ -42,6 +42,8 @@ If you prefer to add keys directly through the CLI:
 docker compose run --rm signet add --name main-key
 ```
 
+**Upgrading:** Pull the latest changes, rebuild, and restart. Database migrations run automatically on daemon startup.
+
 ## Development Setup
 
 **Prereqs:** Node.js 20+, pnpm
@@ -93,6 +95,8 @@ pnpm run prisma:migrate
 pnpm run lfg
 ```
 
+For long-running deployments, use a process supervisor (systemd, PM2, etc.) to ensure automatic restarts on crash. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for examples.
+
 Build and run the UI (in a separate terminal):
 
 ```bash
@@ -110,6 +114,8 @@ pnpm run start:ui      # terminal 2
 ```
 
 The UI server proxies API requests to the daemon, so you only need to expose port 4174. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for remote access configuration.
+
+**Upgrading:** Pull the latest changes, rebuild, and restart. Database migrations run automatically on daemon startup.
 
 ## Configuration
 

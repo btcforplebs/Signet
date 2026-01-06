@@ -1,4 +1,5 @@
 import prisma from '../../db.js';
+import type { ApprovalType } from '../lib/acl.js';
 
 export type RequestStatus = 'all' | 'pending' | 'approved' | 'denied' | 'expired';
 
@@ -18,6 +19,7 @@ export interface RequestRecord {
     createdAt: Date;
     processedAt: Date | null;
     autoApproved: boolean;
+    approvalType: string | null;
     keyUserId: number | null;
     KeyUser?: {
         keyName: string;
@@ -103,12 +105,13 @@ export class RequestRepository {
         });
     }
 
-    async approve(id: string): Promise<void> {
+    async approve(id: string, approvalType?: ApprovalType): Promise<void> {
         await prisma.request.update({
             where: { id },
             data: {
                 allowed: true,
                 processedAt: new Date(),
+                approvalType: approvalType ?? 'manual',
             },
         });
     }
@@ -145,12 +148,14 @@ export class RequestRepository {
         remotePubkey: string;
         params?: string;
         keyUserId?: number;
+        approvalType?: ApprovalType;
     }): Promise<RequestRecord> {
         return prisma.request.create({
             data: {
                 ...data,
                 allowed: true,
                 autoApproved: true,
+                approvalType: data.approvalType,
                 processedAt: new Date(),
             },
             include: { KeyUser: true },

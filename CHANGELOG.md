@@ -1,5 +1,58 @@
 # Changelog
 
+## [Unreleased]
+
+---
+
+## [1.3.0] - 2026-01-05
+
+### Security
+- Bunker URIs now use one-time connection tokens instead of persistent secrets
+  - Each "Generate bunker URI" click creates a fresh token that expires in 5 minutes
+  - Tokens can only be redeemed once (atomic redemption prevents race conditions)
+  - Existing `admin.secret` connections continue to work as fallback for backwards compatibility
+  - Once a client connects, their pubkey is remembered—no token needed for future requests
+
+### Added
+- Approval type tracking: Activity now shows why requests were approved (#20)
+  - ✓ Approved (checkmark) - manually approved by you
+  - 🛡 Approved (shield) - auto-approved by app's trust level
+  - 🔁 Approved (repeat) - auto-approved by saved "Always Allow" permission
+  - Tooltips explain each badge on hover (web UI)
+  - Help page documents badge meanings
+  - Consistent across web UI and Android app
+- Lock/unlock icons in sidebar for quick key management
+  - Lock icon (open padlock) shown for unlocked encrypted keys
+  - Unlock icon (closed padlock) shown for locked keys
+  - Click to lock/unlock without navigating to Keys page
+- Timed app suspension: suspend apps until a specific date and time
+  - Choose "Until I turn it back on" for indefinite suspension
+  - Or select a specific date and time for automatic resumption
+  - Suspension badge shows "Suspended until [time]" for timed suspensions
+  - Apps automatically resume when the suspension period ends
+
+### Changed
+- Web UI: Bunker URI button now opens a modal with QR code display, countdown timer, and copy button
+- Android: Bunker URI button now opens a sheet with QR code display, countdown timer, and copy button
+- Android: Suspend dialog now shows duration options with quick presets (+1h, +8h, Tomorrow)
+- Android: Password fields now support autofill for password managers (Proton Pass, 1Password, etc.)
+
+### Fixed
+- Web UI & Android: Bunker URI preview now correctly shows hex pubkey format instead of bech32 (npub)
+- Web UI: Added full favicon support for all browsers (PNG icons, apple-touch-icon, web manifest) to fix missing icons in pinned tabs
+- Data migration backfills `approvalType` for historical records, ensuring consistent badge display
+- Android: Fixed incorrect GitHub URL in Help screen
+
+### Improved
+- Daemon stability: Added comprehensive monitoring and recovery mechanisms
+  - Global exception handlers catch and log unhandled errors instead of crashing silently
+  - Hourly health status logging (uptime, memory usage, SSE clients, relay connections)
+  - Watchdog automatically resets relay pool after 3 consecutive health check failures
+  - SSE client cleanup now handles error and socket close events to prevent resource leaks
+- Documentation: Added PM2 and Docker Compose sections to DEPLOYMENT.md with restart policies and health checks
+
+---
+
 ## [1.2.1]
 
 ### Added

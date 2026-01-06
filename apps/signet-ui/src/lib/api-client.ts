@@ -182,3 +182,47 @@ export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
   const response = await mutationRequest(path, 'DELETE', body);
   return response.json();
 }
+
+/**
+ * Generate a one-time connection token for a key.
+ * Returns a bunker URI with a token that expires in 5 minutes and can only be used once.
+ */
+export async function generateConnectionToken(keyName: string): Promise<{
+  ok: boolean;
+  bunkerUri?: string;
+  expiresAt?: string;
+  error?: string;
+}> {
+  return apiPost(`/keys/${encodeURIComponent(keyName)}/connection-token`);
+}
+
+/**
+ * Lock an active key, removing it from memory.
+ * The key remains encrypted on disk; all apps and permissions are preserved.
+ */
+export async function lockKey(keyName: string): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  return apiPost(`/keys/${encodeURIComponent(keyName)}/lock`);
+}
+
+/**
+ * Suspend an app, preventing all requests until unsuspended.
+ */
+export async function suspendApp(appId: number): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  return apiPost(`/apps/${appId}/suspend`);
+}
+
+/**
+ * Unsuspend an app, allowing requests again.
+ */
+export async function unsuspendApp(appId: number): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  return apiPost(`/apps/${appId}/unsuspend`);
+}

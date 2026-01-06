@@ -17,6 +17,8 @@ export class AppService {
             trustLevel: string | null;
             createdAt: Date;
             lastUsedAt: Date | null;
+            suspendedAt?: Date | null;
+            suspendUntil?: Date | null;
             signingConditions: { method: string | null; kind: string | null; allowed: boolean | null }[];
         },
         requestCount: number,
@@ -53,6 +55,8 @@ export class AppService {
             permissions: permissions.length > 0 ? permissions : ['All methods'],
             connectedAt: keyUser.createdAt.toISOString(),
             lastUsedAt: keyUser.lastUsedAt?.toISOString() ?? null,
+            suspendedAt: keyUser.suspendedAt?.toISOString() ?? null,
+            suspendUntil: keyUser.suspendUntil?.toISOString() ?? null,
             requestCount,
             methodBreakdown,
         };
@@ -142,6 +146,50 @@ export class AppService {
         }
 
         await updateTrustLevelAcl(appId, trustLevel);
+
+        // Emit event for real-time updates
+        const updatedApp = await this.getAppById(appId);
+        if (updatedApp) {
+            getEventService().emitAppUpdated(updatedApp);
+        }
+    }
+
+    /**
+     * Suspend an app, preventing all requests until unsuspended.
+     * @param appId - The app ID
+     * @param until - Optional date when suspension should automatically end
+     */
+    async suspendApp(appId: number, until?: Date): Promise<void> {
+        const app = await appRepository.findById(appId);
+        if (!app) {
+            throw new Error('App not found');
+        }
+        if (app.suspendedAt) {
+            throw new Error('App is already suspended');
+        }
+
+        await appRepository.suspend(appId, until);
+
+        // Emit event for real-time updates
+        const updatedApp = await this.getAppById(appId);
+        if (updatedApp) {
+            getEventService().emitAppUpdated(updatedApp);
+        }
+    }
+
+    /**
+     * Unsuspend an app, allowing requests again.
+     */
+    async unsuspendApp(appId: number): Promise<void> {
+        const app = await appRepository.findById(appId);
+        if (!app) {
+            throw new Error('App not found');
+        }
+        if (!app.suspendedAt) {
+            throw new Error('App is not suspended');
+        }
+
+        await appRepository.unsuspend(appId);
 
         // Emit event for real-time updates
         const updatedApp = await this.getAppById(appId);

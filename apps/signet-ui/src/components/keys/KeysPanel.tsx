@@ -16,12 +16,14 @@ interface KeysPanelProps {
   error: string | null;
   creating: boolean;
   deleting: boolean;
-  unlocking: boolean;
+  unlocking: string | null;
+  locking: string | null;
   renaming: boolean;
   settingPassphrase: boolean;
   onCreateKey: (data: { keyName: string; passphrase?: string; nsec?: string }) => Promise<KeyInfo | null>;
   onDeleteKey: (keyName: string, passphrase?: string) => Promise<{ success: boolean; revokedApps?: number }>;
   onUnlockKey: (keyName: string, passphrase: string) => Promise<boolean>;
+  onLockKey: (keyName: string) => Promise<boolean>;
   onRenameKey: (keyName: string, newName: string) => Promise<boolean>;
   onSetPassphrase: (keyName: string, passphrase: string) => Promise<boolean>;
   onClearError: () => void;
@@ -35,11 +37,13 @@ export function KeysPanel({
   creating,
   deleting,
   unlocking,
+  locking,
   renaming,
   settingPassphrase,
   onCreateKey,
   onDeleteKey,
   onUnlockKey,
+  onLockKey,
   onRenameKey,
   onSetPassphrase,
   onClearError,
@@ -164,10 +168,12 @@ export function KeysPanel({
               expanded={expandedKey === key.name}
               now={now}
               unlocking={unlocking}
+              locking={locking}
               renaming={renaming}
               settingPassphrase={settingPassphrase}
               onToggleExpand={() => handleToggleExpand(key.name)}
               onUnlock={(passphrase) => onUnlockKey(key.name, passphrase)}
+              onLock={() => onLockKey(key.name)}
               onRename={(newName) => handleRename(key.name, newName)}
               onSetPassphrase={(passphrase) => onSetPassphrase(key.name, passphrase)}
               onDelete={() => handleDeleteClick(key)}

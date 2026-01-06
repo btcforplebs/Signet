@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { KeyService } from '../../services/index.js';
-import { emitCurrentStats } from '../../services/index.js';
+import { emitCurrentStats, getConnectionTokenService } from '../../services/index.js';
 import type { PreHandlerFull } from '../types.js';
 import { sendError } from '../../lib/route-errors.js';
 
@@ -64,6 +64,22 @@ export function registerKeysRoutes(
         }
     });
 
+    // Lock an active key (POST - needs CSRF)
+    fastify.post('/keys/:keyName/lock', { preHandler: [...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
+        const { keyName } = request.params as { keyName: string };
+
+        try {
+            config.keyService.lockKey(keyName);
+
+            // Emit stats update (active key count changed)
+            await emitCurrentStats();
+
+            return reply.send({ ok: true });
+        } catch (error) {
+            return sendError(reply, error);
+        }
+    });
+
     // Set passphrase on an unencrypted key (POST - needs CSRF + rate limit)
     fastify.post('/keys/:keyName/set-passphrase', { preHandler: [...preHandler.rateLimit, ...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
         const { keyName } = request.params as { keyName: string };
@@ -112,6 +128,34 @@ export function registerKeysRoutes(
             return reply.send({
                 ok: true,
                 revokedApps: result.revokedApps,
+            });
+        } catch (error) {
+            return sendError(reply, error);
+        }
+    });
+
+    // Generate a one-time connection token (POST - needs CSRF + rate limit)
+    fastify.post('/keys/:keyName/connection-token', { preHandler: [...preHandler.rateLimit, ...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
+        const { keyName } = request.params as { keyName: string };
+
+        // Verify key exists and is active
+        if (!config.keyService.isKeyActive(keyName)) {
+            return reply.code(400).send({ error: 'Key is not active' });
+        }
+
+        try {
+            const tokenService = getConnectionTokenService();
+            const result = await tokenService.createToken(keyName);
+            const bunkerUri = config.keyService.buildBunkerUriWithToken(keyName, result.token);
+
+            if (!bunkerUri) {
+                return reply.code(500).send({ error: 'Failed to build bunker URI' });
+            }
+
+            return reply.send({
+                ok: true,
+                bunkerUri,
+                expiresAt: result.expiresAt.toISOString(),
             });
         } catch (error) {
             return sendError(reply, error);

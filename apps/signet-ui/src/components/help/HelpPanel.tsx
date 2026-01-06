@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ExternalLink, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Copy, Check, Shield, Repeat } from 'lucide-react';
 import { copyToClipboard } from '../../lib/clipboard.js';
 import styles from './HelpPanel.module.css';
 
@@ -158,6 +158,23 @@ export function HelpPanel() {
               <dt>nip44_encrypt / nip44_decrypt</dt>
               <dd>Encrypt or decrypt a direct message (modern format)</dd>
             </dl>
+          </AccordionItem>
+
+          <AccordionItem title="Approval Badges">
+            <p>The Activity page and Recent widget show badges indicating how each request was approved:</p>
+            <dl className={styles.definitionList}>
+              <dt><Check size={14} style={{ verticalAlign: 'middle' }} /> Approved</dt>
+              <dd>You manually clicked Approve for this request</dd>
+
+              <dt><Shield size={14} style={{ verticalAlign: 'middle' }} /> Approved</dt>
+              <dd>Auto-approved by the app's trust level (e.g., "Auto-approve Safe" allows reactions)</dd>
+
+              <dt><Repeat size={14} style={{ verticalAlign: 'middle' }} /> Approved</dt>
+              <dd>Auto-approved by a saved permission you created with "Always allow this action"</dd>
+            </dl>
+            <p className={styles.hint}>
+              Hover over any badge to see a tooltip explaining how that request was approved.
+            </p>
           </AccordionItem>
         </div>
 

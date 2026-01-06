@@ -17,12 +17,19 @@ export type ActiveKeyMap = Record<string, string>;
  */
 export type OnKeyActivatedCallback = (keyName: string, secret: string) => Promise<void>;
 
+/**
+ * Callback invoked when a key is locked.
+ * Used to stop the bunker backend for the key.
+ */
+export type OnKeyLockedCallback = (keyName: string) => void;
+
 export interface KeyServiceConfig {
     configFile: string;
     allKeys: Record<string, StoredKey>;
     nostrRelays: string[];
     adminSecret?: string;
     onKeyActivated?: OnKeyActivatedCallback;
+    onKeyLocked?: OnKeyLockedCallback;
 }
 
 export class KeyService {
@@ -46,8 +53,47 @@ export class KeyService {
         this.config.onKeyActivated = callback;
     }
 
+    /**
+     * Set the callback for when a key is locked.
+     * Used to stop the bunker backend for the key.
+     */
+    setOnKeyLocked(callback: OnKeyLockedCallback): void {
+        this.config.onKeyLocked = callback;
+    }
+
     isKeyActive(keyName: string): boolean {
         return !!this.activeKeys[keyName];
+    }
+
+    /**
+     * Lock an active key, removing it from memory.
+     * The key remains encrypted on disk; all apps and permissions are preserved.
+     */
+    lockKey(keyName: string): void {
+        const record = this.config.allKeys[keyName];
+        if (!record) {
+            throw new Error('Key not found');
+        }
+
+        if (!this.activeKeys[keyName]) {
+            throw new Error('Key is not active');
+        }
+
+        // Only encrypted keys can be locked (unencrypted keys would auto-unlock on restart anyway)
+        if (!record.iv || !record.data) {
+            throw new Error('Cannot lock an unencrypted key');
+        }
+
+        // Remove from memory
+        delete this.activeKeys[keyName];
+
+        // Notify to stop the backend
+        if (this.config.onKeyLocked) {
+            this.config.onKeyLocked(keyName);
+        }
+
+        // Emit event for real-time updates
+        getEventService().emitKeyLocked(keyName);
     }
 
     async createKey(options: {
@@ -106,6 +152,7 @@ export class KeyService {
 
         const keyInfo: KeyInfo = {
             name: keyName,
+            pubkey,
             npub,
             bunkerUri,
             status: 'online',
@@ -166,14 +213,16 @@ export class KeyService {
             const isEncrypted = !!(entry?.iv && entry?.data);
             const status = isOnline ? 'online' : isEncrypted ? 'locked' : 'offline';
 
+            let pubkey: string | undefined;
             let npub: string | undefined;
             let bunkerUri: string | undefined;
 
             if (isOnline) {
                 try {
-                    const { pubkey: pk, npub: np } = this.deriveKeysFromSecret(this.activeKeys[name]);
-                    npub = np;
-                    bunkerUri = this.buildBunkerUri(pk);
+                    const derived = this.deriveKeysFromSecret(this.activeKeys[name]);
+                    pubkey = derived.pubkey;
+                    npub = derived.npub;
+                    bunkerUri = this.buildBunkerUri(pubkey);
                 } catch (error) {
                     console.log(`Unable to get info for key ${name}: ${(error as Error).message}`);
                 }
@@ -182,9 +231,10 @@ export class KeyService {
                     const secret = entry.key.startsWith('nsec1')
                         ? entry.key
                         : nsecEncode(hexToBytes(entry.key));
-                    const { pubkey: pk, npub: np } = this.deriveKeysFromSecret(secret);
-                    npub = np;
-                    bunkerUri = this.buildBunkerUri(pk);
+                    const derived = this.deriveKeysFromSecret(secret);
+                    pubkey = derived.pubkey;
+                    npub = derived.npub;
+                    bunkerUri = this.buildBunkerUri(pubkey);
                 } catch (error) {
                     console.log(`Unable to get info for key ${name}: ${(error as Error).message}`);
                 }
@@ -199,6 +249,7 @@ export class KeyService {
 
             keys.push({
                 name,
+                pubkey,
                 npub,
                 bunkerUri,
                 status,
@@ -262,6 +313,21 @@ export class KeyService {
         const secret = this.config.adminSecret?.trim().toLowerCase();
         const secretParam = secret ? `&secret=${encodeURIComponent(secret)}` : '';
         return `bunker://${pubkey}?${relayParams}${secretParam}`;
+    }
+
+    /**
+     * Build a bunker URI with a custom token instead of the admin secret.
+     * Used for one-time connection tokens.
+     */
+    buildBunkerUriWithToken(keyName: string, token: string): string | null {
+        const secret = this.activeKeys[keyName];
+        if (!secret) return null;
+
+        const { pubkey } = this.deriveKeysFromSecret(secret);
+        const relayParams = this.config.nostrRelays
+            .map(relay => `relay=${encodeURIComponent(relay)}`)
+            .join('&');
+        return `bunker://${pubkey}?${relayParams}&secret=${encodeURIComponent(token)}`;
     }
 
     /**

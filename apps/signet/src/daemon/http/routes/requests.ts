@@ -148,6 +148,7 @@ export function registerRequestRoutes(
                     data: {
                         allowed: true,
                         processedAt: new Date(),
+                        approvalType: 'manual',
                     },
                 });
 
@@ -202,6 +203,7 @@ export function registerRequestRoutes(
                             method: record.method,
                             params: record.params,
                             keyUserId: keyUser.id,
+                            approvalType: 'manual',
                         },
                     });
                 }

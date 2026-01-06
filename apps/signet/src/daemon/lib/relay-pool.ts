@@ -20,15 +20,21 @@ interface ActiveSubscription {
     close: () => void;
 }
 
+// Track consecutive health check failures for watchdog
+const WATCHDOG_FAILURE_THRESHOLD = 3;
+const WATCHDOG_RESET_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between resets
+
 /**
  * Thin wrapper around nostr-tools SimplePool.
  * Provides connection status tracking and simplified subscription management.
  */
 export class RelayPool {
-    private readonly pool: SimplePool;
+    private pool: SimplePool;
     private readonly relays: string[];
     private readonly subscriptions: Map<string, ActiveSubscription> = new Map();
     private readonly relayStatus: Map<string, RelayStatus> = new Map();
+    private consecutiveFailures = 0;
+    private lastReset: number = 0;
 
     // Callbacks for external monitoring
     private onPublishSuccess?: (event: Event, relay: string) => void;
@@ -237,6 +243,88 @@ export class RelayPool {
         // We can trigger this by subscribing to a filter that won't match anything.
         // Or we just trust that publish/subscribe will connect as needed.
         debug('ensureConnected called - SimplePool connects lazily');
+    }
+
+    /**
+     * Report a health check success. Resets the failure counter.
+     */
+    public reportHealthCheckSuccess(): void {
+        if (this.consecutiveFailures > 0) {
+            debug('health check passed, resetting failure counter from %d', this.consecutiveFailures);
+        }
+        this.consecutiveFailures = 0;
+    }
+
+    /**
+     * Report a health check failure. May trigger pool reset if threshold exceeded.
+     * @returns true if the pool was reset
+     */
+    public reportHealthCheckFailure(): boolean {
+        this.consecutiveFailures++;
+        debug('health check failed, consecutive failures: %d', this.consecutiveFailures);
+
+        if (this.consecutiveFailures >= WATCHDOG_FAILURE_THRESHOLD) {
+            const now = Date.now();
+            if (now - this.lastReset >= WATCHDOG_RESET_COOLDOWN_MS) {
+                console.log(`=== WATCHDOG: ${this.consecutiveFailures} consecutive health check failures, resetting pool ===`);
+                this.resetPool();
+                return true;
+            } else {
+                const cooldownRemaining = Math.round((WATCHDOG_RESET_COOLDOWN_MS - (now - this.lastReset)) / 1000);
+                debug('watchdog: in cooldown, %ds remaining', cooldownRemaining);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Force reset the underlying SimplePool. Closes all connections and creates a fresh pool.
+     * Use this when the pool appears to be in a corrupted state.
+     */
+    public resetPool(): void {
+        console.log('=== POOL RESET ===');
+        console.log(`Time: ${new Date().toISOString()}`);
+        console.log(`Previous consecutive failures: ${this.consecutiveFailures}`);
+        console.log('Closing existing pool and creating fresh instance...');
+
+        // Close the existing pool
+        try {
+            this.pool.close(this.relays);
+        } catch (error) {
+            console.error('Error closing pool:', error);
+        }
+
+        // Create a fresh pool
+        this.pool = new SimplePool();
+        this.consecutiveFailures = 0;
+        this.lastReset = Date.now();
+
+        // Reset all relay statuses
+        for (const url of this.relays) {
+            this.relayStatus.set(url, {
+                url,
+                connected: false,
+                lastConnected: null,
+                lastDisconnected: new Date(),
+                lastError: 'Pool reset',
+            });
+        }
+
+        console.log('Pool reset complete. Subscriptions will be recreated by SubscriptionManager.');
+        console.log('==================');
+
+        this.onStatusChange?.();
+    }
+
+    /**
+     * Get watchdog status for diagnostics.
+     */
+    public getWatchdogStatus(): { consecutiveFailures: number; lastReset: Date | null; threshold: number } {
+        return {
+            consecutiveFailures: this.consecutiveFailures,
+            lastReset: this.lastReset > 0 ? new Date(this.lastReset) : null,
+            threshold: WATCHDOG_FAILURE_THRESHOLD,
+        };
     }
 
     private updateRelayStatus(url: string, connected: boolean, error?: string): void {

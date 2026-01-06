@@ -15,6 +15,10 @@ interface AppLayoutProps {
   sseConnected: boolean;
   onOpenCommandPalette?: () => void;
   relayStatus: RelayStatusResponse | null;
+  lockingKey?: string | null;
+  unlockingKey?: string | null;
+  onLockKey?: (keyName: string) => Promise<boolean>;
+  onUnlockKey?: (keyName: string, passphrase: string) => Promise<boolean>;
 }
 
 export function AppLayout({
@@ -28,6 +32,10 @@ export function AppLayout({
   sseConnected,
   onOpenCommandPalette,
   relayStatus,
+  lockingKey,
+  unlockingKey,
+  onLockKey,
+  onUnlockKey,
 }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -70,6 +78,10 @@ export function AppLayout({
           onKeySelect={onKeySelect}
           sseConnected={sseConnected}
           relayStatus={relayStatus}
+          lockingKey={lockingKey}
+          unlockingKey={unlockingKey}
+          onLockKey={onLockKey}
+          onUnlockKey={onUnlockKey}
         />
       </div>
 

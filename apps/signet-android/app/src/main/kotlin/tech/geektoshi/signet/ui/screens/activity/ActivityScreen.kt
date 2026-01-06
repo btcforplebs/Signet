@@ -302,9 +302,12 @@ private fun RequestCard(
                 StatusBadge(
                     status = when {
                         request.processedAt == null -> BadgeStatus.PENDING
-                        request.allowed == true && request.autoApproved -> BadgeStatus.AUTO_APPROVED
-                        request.allowed == true -> BadgeStatus.APPROVED
                         request.allowed == false -> BadgeStatus.DENIED
+                        request.allowed == true && request.approvalType == "manual" -> BadgeStatus.APPROVED
+                        request.allowed == true && request.approvalType == "auto_trust" -> BadgeStatus.AUTO_TRUST
+                        request.allowed == true && request.approvalType == "auto_permission" -> BadgeStatus.AUTO_PERMISSION
+                        request.allowed == true && request.autoApproved -> BadgeStatus.AUTO_APPROVED  // Backwards compat
+                        request.allowed == true -> BadgeStatus.APPROVED
                         else -> BadgeStatus.EXPIRED
                     }
                 )

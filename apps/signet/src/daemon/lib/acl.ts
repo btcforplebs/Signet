@@ -19,10 +19,28 @@ interface CacheEntry {
     keyUser: {
         id: number;
         revokedAt: Date | null;
+        suspendedAt: Date | null;
+        suspendUntil: Date | null;
         trustLevel: string | null;
     };
     hasExplicitDeny: boolean;
     timestamp: number;
+}
+
+/**
+ * Check if an app is currently suspended.
+ * Returns true if suspended and suspension hasn't expired yet.
+ */
+function isCurrentlySuspended(suspendedAt: Date | null, suspendUntil: Date | null): boolean {
+    if (!suspendedAt) {
+        return false;
+    }
+    // If no end time, suspended indefinitely
+    if (!suspendUntil) {
+        return true;
+    }
+    // If end time has passed, no longer suspended
+    return suspendUntil.getTime() > Date.now();
 }
 
 const aclCache = new Map<string, CacheEntry>();
@@ -96,14 +114,21 @@ export type AllowScope = {
 };
 
 /**
+ * Approval type for tracking how a request was approved
+ */
+export type ApprovalType = 'manual' | 'auto_trust' | 'auto_permission';
+
+/**
  * Result of an ACL permission check.
  * - permitted: true (allowed), false (denied), undefined (needs manual approval)
- * - autoApproved: true if permitted via trust level (not explicit condition)
+ * - autoApproved: true if permitted automatically (for backwards compatibility)
+ * - approvalType: distinguishes between trust level and explicit permission auto-approval
  * - keyUserId: the KeyUser id (for logging)
  */
 export interface PermissionResult {
     permitted: boolean | undefined;
     autoApproved: boolean;
+    approvalType?: ApprovalType;
     keyUserId?: number;
 }
 
@@ -306,6 +331,9 @@ export async function checkRequestPermission(
         if (cached.keyUser.revokedAt) {
             return { permitted: false, autoApproved: false, keyUserId: cached.keyUser.id };
         }
+        if (isCurrentlySuspended(cached.keyUser.suspendedAt, cached.keyUser.suspendUntil)) {
+            return { permitted: false, autoApproved: false, keyUserId: cached.keyUser.id };
+        }
         if (cached.hasExplicitDeny) {
             return { permitted: false, autoApproved: false, keyUserId: cached.keyUser.id };
         }
@@ -315,7 +343,7 @@ export async function checkRequestPermission(
         // Fetch from database and cache
         const keyUser = await prisma.keyUser.findUnique({
             where: { unique_key_user: { keyName, userPubkey: remotePubkey } },
-            select: { id: true, revokedAt: true, trustLevel: true },
+            select: { id: true, revokedAt: true, suspendedAt: true, suspendUntil: true, trustLevel: true },
         });
 
         if (!keyUser) {
@@ -324,6 +352,16 @@ export async function checkRequestPermission(
 
         // Check if user is revoked
         if (keyUser.revokedAt) {
+            return { permitted: false, autoApproved: false, keyUserId: keyUser.id };
+        }
+
+        // Check if user is suspended (and suspension hasn't expired)
+        if (isCurrentlySuspended(keyUser.suspendedAt, keyUser.suspendUntil)) {
+            // Cache the suspended state
+            setCachedEntry(keyName, remotePubkey, {
+                keyUser,
+                hasExplicitDeny: false,
+            });
             return { permitted: false, autoApproved: false, keyUserId: keyUser.id };
         }
 
@@ -360,9 +398,13 @@ export async function checkRequestPermission(
     });
 
     if (condition) {
-        if (condition.allowed === true || condition.allowed === false) {
-            // Explicit condition - not auto-approved
-            return { permitted: condition.allowed, autoApproved: false, keyUserId };
+        if (condition.allowed === true) {
+            // Explicit permission grant - auto-approved via SigningCondition
+            return { permitted: true, autoApproved: true, approvalType: 'auto_permission', keyUserId };
+        }
+        if (condition.allowed === false) {
+            // Explicit deny - not auto-approved
+            return { permitted: false, autoApproved: false, keyUserId };
         }
     }
 
@@ -375,7 +417,7 @@ export async function checkRequestPermission(
         }).catch(() => {
             // Ignore errors on lastUsedAt update
         });
-        return { permitted: true, autoApproved: true, keyUserId };
+        return { permitted: true, autoApproved: true, approvalType: 'auto_trust', keyUserId };
     }
 
     // No decision - will trigger approval request

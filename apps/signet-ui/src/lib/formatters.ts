@@ -75,6 +75,31 @@ export const isActiveRecently = (date: string | null): boolean => {
   return hours < 24;
 };
 
+/**
+ * Format a future date as a compact string
+ */
+export const formatFutureDate = (date: string): string => {
+  const d = new Date(date);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  // If less than 24 hours, show time only
+  if (diffHours < 24 && diffHours > 0) {
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // If same year, show month/day + time
+  if (d.getFullYear() === now.getFullYear()) {
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+      ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // Otherwise show full date
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 export const formatTtl = (seconds: number): string => {
   if (seconds <= 0) return 'Expired';
   if (seconds < 60) return `${seconds}s remaining`;

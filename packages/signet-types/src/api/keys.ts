@@ -18,6 +18,7 @@ export interface KeySummary {
  */
 export interface KeyInfo {
     name: string;
+    pubkey?: string;
     npub?: string;
     bunkerUri?: string;
     status: KeyStatus;
@@ -57,5 +58,15 @@ export interface CreateKeyRequest {
 export interface CreateKeyResponse {
     ok: boolean;
     key?: KeyInfo;
+    error?: string;
+}
+
+/**
+ * Response from generating a one-time connection token
+ */
+export interface GenerateConnectionTokenResponse {
+    ok: boolean;
+    bunkerUri?: string;
+    expiresAt?: string;
     error?: string;
 }

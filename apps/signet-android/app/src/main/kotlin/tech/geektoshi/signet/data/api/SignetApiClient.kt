@@ -2,6 +2,8 @@ package tech.geektoshi.signet.data.api
 
 import tech.geektoshi.signet.data.model.ApproveRequestBody
 import tech.geektoshi.signet.data.model.AppsResponse
+import tech.geektoshi.signet.data.model.ConnectionTokenResponse
+import tech.geektoshi.signet.data.model.SuspendAppBody
 import tech.geektoshi.signet.data.model.DashboardResponse
 import tech.geektoshi.signet.data.model.KeysResponse
 import tech.geektoshi.signet.data.model.OperationResponse
@@ -143,6 +145,26 @@ class SignetApiClient(
     }
 
     /**
+     * Lock an active key, removing it from memory.
+     * The key remains encrypted on disk; all apps and permissions are preserved.
+     */
+    suspend fun lockKey(keyName: String): OperationResponse {
+        return client.post("/keys/$keyName/lock") {
+            setBody(emptyMap<String, String>())
+        }.body()
+    }
+
+    /**
+     * Generate a one-time connection token for a key.
+     * Returns a bunker URI with a token that expires in 5 minutes and can only be used once.
+     */
+    suspend fun generateConnectionToken(keyName: String): ConnectionTokenResponse {
+        return client.post("/keys/$keyName/connection-token") {
+            setBody(emptyMap<String, String>())
+        }.body()
+    }
+
+    /**
      * Get list of connected apps
      */
     suspend fun getApps(): AppsResponse {
@@ -171,6 +193,25 @@ class SignetApiClient(
                 "description" to description,
                 "trustLevel" to trustLevel
             ).filterValues { it != null })
+        }.body()
+    }
+
+    /**
+     * Suspend an app, preventing all requests until unsuspended.
+     * @param until Optional ISO8601 timestamp when the suspension should automatically end
+     */
+    suspend fun suspendApp(id: Int, until: String? = null): OperationResponse {
+        return client.post("/apps/$id/suspend") {
+            setBody(SuspendAppBody(until = until))
+        }.body()
+    }
+
+    /**
+     * Unsuspend an app, allowing requests again.
+     */
+    suspend fun unsuspendApp(id: Int): OperationResponse {
+        return client.post("/apps/$id/unsuspend") {
+            setBody(emptyMap<String, String>())
         }.body()
     }
 

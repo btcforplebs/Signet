@@ -41,7 +41,7 @@ import tech.geektoshi.signet.ui.theme.TextMuted
 import tech.geektoshi.signet.ui.theme.TextPrimary
 import tech.geektoshi.signet.ui.theme.TextSecondary
 
-private const val GITHUB_ISSUES_URL = "https://github.com/ArcadeLabsInc/signet/issues"
+private const val GITHUB_ISSUES_URL = "https://github.com/Letdown2491/signet/issues"
 
 @Composable
 fun HelpScreen(
@@ -158,6 +158,16 @@ fun HelpScreen(
                 ExpandableSection(title = "Request Actions") {
                     Text(
                         text = "sign_event - Sign a Nostr event (post, reaction, etc.)\n\nconnect - An app wants to establish a connection\n\nget_public_key - An app is requesting your public identity\n\nnip04_encrypt / nip04_decrypt - Encrypt or decrypt a direct message (legacy format)\n\nnip44_encrypt / nip44_decrypt - Encrypt or decrypt a direct message (modern format)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+
+                HorizontalDivider(color = TextMuted.copy(alpha = 0.2f))
+
+                ExpandableSection(title = "Approval Badges") {
+                    Text(
+                        text = "The Activity page and Recent widget show badges indicating how each request was approved:\n\n✓ Approved\nYou manually clicked Approve for this request\n\n🛡 Approved (shield icon)\nAuto-approved by the app's trust level (e.g., \"Reasonable\" allows reactions)\n\n🔁 Approved (repeat icon)\nAuto-approved by a saved permission you created with \"Always allow this action\"",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )

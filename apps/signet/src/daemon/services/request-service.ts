@@ -87,6 +87,7 @@ export class RequestService {
             requiresPassword,
             processedAt: record.processedAt?.toISOString() ?? null,
             autoApproved: record.autoApproved,
+            approvalType: record.approvalType ?? undefined,
             appName: record.KeyUser?.description ?? null,
             allowed: record.allowed,
         };

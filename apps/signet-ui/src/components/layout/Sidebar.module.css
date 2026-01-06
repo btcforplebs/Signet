@@ -292,7 +292,8 @@
   /* Used for styling children when key is active */
 }
 
-.copyButton {
+.copyButton,
+.lockButton {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -307,7 +308,8 @@
   flex-shrink: 0;
 }
 
-.keyRowActive .copyButton {
+.keyRowActive .copyButton,
+.keyRowActive .lockButton {
   color: var(--text-primary);
 }
 
@@ -316,8 +318,32 @@
   color: var(--accent);
 }
 
+.lockButton:hover {
+  background: var(--surface-hover);
+  color: var(--warning);
+}
+
 .copyButton.copied {
   color: var(--success);
+}
+
+.copyButton:disabled,
+.lockButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .keyEmpty {

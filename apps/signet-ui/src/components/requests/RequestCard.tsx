@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Check, Shield, Repeat } from 'lucide-react';
 import type { DisplayRequest, RequestMeta, TrustLevel } from '@signet/types';
 import { getKindLabel, getMethodLabel, getTrustLevelBehavior, parseConnectPermissions, formatPermission } from '@signet/types';
 import { getMethodInfo, getTrustLevelInfo } from '../../lib/event-labels.js';
@@ -89,9 +90,23 @@ export function RequestCard({
             <span className={styles.badgeExpired}>Expired</span>
           )}
           {request.state === 'approved' && (
-            <span className={request.autoApproved ? styles.badgeAuto : styles.badgeApproved}>
-              {request.autoApproved ? 'Auto Approved' : 'Approved'}
-            </span>
+            request.approvalType === 'manual' ? (
+              <span className={styles.badgeApproved} title="Manually approved by you">
+                <Check size={12} /> Approved
+              </span>
+            ) : request.approvalType === 'auto_trust' ? (
+              <span className={styles.badgeAuto} title="Auto-approved by app's trust level">
+                <Shield size={12} /> Approved
+              </span>
+            ) : request.approvalType === 'auto_permission' ? (
+              <span className={styles.badgeAuto} title="Auto-approved by saved permission">
+                <Repeat size={12} /> Approved
+              </span>
+            ) : request.autoApproved ? (
+              <span className={styles.badgeAuto}>Auto Approved</span>
+            ) : (
+              <span className={styles.badgeApproved}>Approved</span>
+            )
           )}
           {request.state === 'denied' && (
             <span className={styles.badgeDenied}>Denied</span>

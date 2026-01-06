@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import type { ConnectedApp, TrustLevel, MethodBreakdown } from '@signet/types';
 import { parseConnectPermissions, formatPermission } from '@signet/types';
-import { toNpub, formatLastActive, isActiveRecently } from '../../lib/formatters.js';
+import { toNpub, formatLastActive, isActiveRecently, formatFutureDate } from '../../lib/formatters.js';
 import { getPermissionRisk, getTrustLevelInfo } from '../../lib/event-labels.js';
 import { LoadingSpinner } from '../shared/LoadingSpinner.js';
 import { ConfirmDialog } from '../shared/ConfirmDialog.js';
 import { PageHeader } from '../shared/PageHeader.js';
+import { SuspendAppModal } from './SuspendAppModal.js';
 import { ChevronDown, ChevronRight, Search, Smartphone } from 'lucide-react';
 import styles from './AppsPanel.module.css';
 
@@ -71,6 +72,8 @@ interface AppsPanelProps {
   onRevokeApp: (appId: number) => Promise<boolean>;
   onUpdateDescription: (appId: number, description: string) => Promise<boolean>;
   onUpdateTrustLevel: (appId: number, trustLevel: TrustLevel) => Promise<boolean>;
+  onSuspendApp: (appId: number, until?: Date) => Promise<boolean>;
+  onUnsuspendApp: (appId: number) => Promise<boolean>;
   onClearError: () => void;
   onNavigateToHelp: () => void;
 }
@@ -82,6 +85,8 @@ export function AppsPanel({
   onRevokeApp,
   onUpdateDescription,
   onUpdateTrustLevel,
+  onSuspendApp,
+  onUnsuspendApp,
   onClearError,
   onNavigateToHelp,
 }: AppsPanelProps) {
@@ -89,6 +94,8 @@ export function AppsPanel({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
+  const [suspendModalApp, setSuspendModalApp] = useState<ConnectedApp | null>(null);
+  const [suspending, setSuspending] = useState(false);
   const [trustMenuOpen, setTrustMenuOpen] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [keyFilter, setKeyFilter] = useState('all');
@@ -167,6 +174,17 @@ export function AppsPanel({
   const handleTrustChange = async (appId: number, level: TrustLevel) => {
     await onUpdateTrustLevel(appId, level);
     setTrustMenuOpen(null);
+  };
+
+  const handleSuspendSubmit = async (until?: Date) => {
+    if (!suspendModalApp) return;
+    setSuspending(true);
+    try {
+      await onSuspendApp(suspendModalApp.id, until);
+      setSuspendModalApp(null);
+    } finally {
+      setSuspending(false);
+    }
   };
 
   if (loading && apps.length === 0) {
@@ -248,19 +266,25 @@ export function AppsPanel({
           {filteredApps.map(app => {
             const isExpanded = expandedId === app.id;
             const isActive = isActiveRecently(app.lastUsedAt);
+            const isSuspended = !!app.suspendedAt;
             const trustInfo = getTrustLevelInfo(app.trustLevel);
             const displayName = app.description || toNpub(app.userPubkey).slice(0, 16) + '...';
 
             return (
-              <div key={app.id} className={`${styles.appCard} ${isExpanded ? styles.expanded : ''}`}>
+              <div key={app.id} className={`${styles.appCard} ${isExpanded ? styles.expanded : ''} ${isSuspended ? styles.suspended : ''}`}>
                 <button
                   type="button"
                   className={styles.appHeader}
                   onClick={() => handleExpand(app.id)}
                 >
                   <div className={styles.appMain}>
-                    <span className={`${styles.activityDot} ${isActive ? styles.active : ''}`} />
+                    <span className={`${styles.activityDot} ${isActive && !isSuspended ? styles.active : ''}`} />
                     <span className={styles.appName}>{displayName}</span>
+                    {isSuspended && (
+                      <span className={styles.suspendedBadge}>
+                        {app.suspendUntil ? `Suspended until ${formatFutureDate(app.suspendUntil)}` : 'Suspended'}
+                      </span>
+                    )}
                   </div>
                   <span className={styles.appLastActive}>{formatLastActive(app.lastUsedAt)}</span>
                   <div className={styles.appMeta}>
@@ -357,6 +381,15 @@ export function AppsPanel({
                           <button type="button" className={styles.renameButton} onClick={() => startEdit(app)}>
                             Rename
                           </button>
+                          {isSuspended ? (
+                            <button type="button" className={styles.resumeButton} onClick={() => onUnsuspendApp(app.id)}>
+                              Resume
+                            </button>
+                          ) : (
+                            <button type="button" className={styles.suspendButton} onClick={() => setSuspendModalApp(app)}>
+                              Suspend
+                            </button>
+                          )}
                           <button type="button" className={styles.revokeButton} onClick={() => setRevokeConfirm(app.id)}>
                             Revoke Access
                           </button>
@@ -379,6 +412,15 @@ export function AppsPanel({
         danger
         onConfirm={handleRevoke}
         onCancel={() => setRevokeConfirm(null)}
+      />
+
+      <SuspendAppModal
+        open={suspendModalApp !== null}
+        appName={suspendModalApp?.description || toNpub(suspendModalApp?.userPubkey || '').slice(0, 16) + '...'}
+        loading={suspending}
+        error={error}
+        onSubmit={handleSuspendSubmit}
+        onCancel={() => setSuspendModalApp(null)}
       />
     </div>
   );

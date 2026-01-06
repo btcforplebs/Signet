@@ -36,4 +36,5 @@ export type {
     DashboardStats,
     ActivityEntry,
     DashboardResponse,
+    ApprovalType,
 } from './dashboard.js';

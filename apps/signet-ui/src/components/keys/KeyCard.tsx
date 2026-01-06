@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Copy, QrCode, Lock, Unlock, Trash2, Users, P
 import { formatRelativeTime, toNpub, isActiveRecently } from '../../lib/formatters.js';
 import { getTrustLevelInfo } from '../../lib/event-labels.js';
 import { copyToClipboard as copyText } from '../../lib/clipboard.js';
+import { BunkerURIModal } from '../layout/BunkerURIModal.js';
 import styles from './KeysPanel.module.css';
 
 interface KeyCardProps {
@@ -11,11 +12,13 @@ interface KeyCardProps {
   apps: ConnectedApp[];
   expanded: boolean;
   now: number;
-  unlocking: boolean;
+  unlocking: string | null;  // Key name being unlocked, or null
+  locking: string | null;    // Key name being locked, or null
   renaming: boolean;
   settingPassphrase: boolean;
   onToggleExpand: () => void;
   onUnlock: (passphrase: string) => Promise<boolean>;
+  onLock: () => void;
   onRename: (newName: string) => Promise<boolean>;
   onSetPassphrase: (passphrase: string) => Promise<boolean>;
   onDelete: () => void;
@@ -29,10 +32,12 @@ export function KeyCard({
   expanded,
   now,
   unlocking,
+  locking,
   renaming,
   settingPassphrase,
   onToggleExpand,
   onUnlock,
+  onLock,
   onRename,
   onSetPassphrase,
   onDelete,
@@ -53,6 +58,9 @@ export function KeyCard({
 
   // Clipboard feedback
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Bunker URI modal state
+  const [showBunkerModal, setShowBunkerModal] = useState(false);
 
   const isActive = isActiveRecently(key.lastUsedAt);
 
@@ -194,10 +202,10 @@ export function KeyCard({
                   type="button"
                   className={styles.unlockButton}
                   onClick={handleUnlock}
-                  disabled={unlocking || !unlockPassphrase.trim()}
+                  disabled={unlocking === key.name || !unlockPassphrase.trim()}
                 >
                   <Unlock size={16} />
-                  {unlocking ? 'Unlocking...' : 'Unlock'}
+                  {unlocking === key.name ? 'Unlocking...' : 'Unlock'}
                 </button>
               </div>
             </div>
@@ -230,26 +238,19 @@ export function KeyCard({
                 </div>
               )}
 
-              {key.bunkerUri && (
+              {key.status === 'online' && (
                 <div className={styles.detailSection}>
                   <span className={styles.detailLabel}>Bunker Connection</span>
                   <div className={styles.detailRow}>
                     <code className={styles.detailValue}>
-                      {key.bunkerUri.slice(0, 40)}...
+                      bunker://{key.pubkey?.slice(0, 16)}...
                     </code>
                     <div className={styles.detailActions}>
                       <button
                         type="button"
                         className={styles.actionButton}
-                        onClick={() => copyToClipboard(key.bunkerUri!, `bunker-${key.name}`)}
-                      >
-                        <Copy size={14} />
-                        {copiedField === `bunker-${key.name}` ? 'Copied' : 'Copy'}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.actionButton}
-                        onClick={() => onShowQR(key.bunkerUri!, 'Bunker URI')}
+                        onClick={() => setShowBunkerModal(true)}
+                        title="Show bunker URI QR code"
                       >
                         <QrCode size={14} />
                         QR
@@ -401,6 +402,18 @@ export function KeyCard({
                   <Pencil size={16} />
                   Rename
                 </button>
+                {key.status === 'online' && key.isEncrypted && (
+                  <button
+                    type="button"
+                    className={styles.lockButton}
+                    onClick={onLock}
+                    disabled={locking === key.name}
+                    title="Lock key to remove it from memory"
+                  >
+                    <Lock size={16} />
+                    {locking === key.name ? 'Locking...' : 'Lock'}
+                  </button>
+                )}
                 <button
                   type="button"
                   className={styles.deleteButton}
@@ -414,6 +427,13 @@ export function KeyCard({
           </div>
         </div>
       )}
+
+      {/* Bunker URI Modal */}
+      <BunkerURIModal
+        open={showBunkerModal}
+        keyName={key.name}
+        onClose={() => setShowBunkerModal(false)}
+      />
     </div>
   );
 }

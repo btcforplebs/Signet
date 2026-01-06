@@ -340,3 +340,221 @@ sudo rm /var/service/signet-ui
 - Runit automatically restarts services that exit. No additional configuration needed.
 - Logs are managed by `svlogd` with automatic rotation. The `-tt` flag adds timestamps.
 - `chpst -u signet:signet` runs the process as the signet user.
+
+## PM2 (Process Manager)
+
+PM2 is a popular Node.js process manager that works on any system. It provides automatic restarts, log management, and monitoring.
+
+### Installation
+
+```bash
+npm install -g pm2
+```
+
+### Ecosystem File
+
+Create `ecosystem.config.js` in `/opt/signet`:
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: 'signet-daemon',
+      cwd: '/opt/signet',
+      script: 'pnpm',
+      args: 'run start:daemon',
+      env: {
+        NODE_ENV: 'production'
+      },
+      // Restart settings
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 5000,
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: '/var/log/signet/daemon-error.log',
+      out_file: '/var/log/signet/daemon-out.log',
+      merge_logs: true,
+      // Memory management
+      max_memory_restart: '500M'
+    },
+    {
+      name: 'signet-ui',
+      cwd: '/opt/signet',
+      script: 'pnpm',
+      args: 'run start:ui',
+      env: {
+        NODE_ENV: 'production'
+      },
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 5000,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: '/var/log/signet/ui-error.log',
+      out_file: '/var/log/signet/ui-out.log',
+      merge_logs: true,
+      max_memory_restart: '300M'
+    }
+  ]
+};
+```
+
+### Usage
+
+```bash
+# Create log directory
+sudo mkdir -p /var/log/signet
+sudo chown $USER:$USER /var/log/signet
+
+# Start all services
+cd /opt/signet
+pm2 start ecosystem.config.js
+
+# Save PM2 configuration for startup
+pm2 save
+
+# Enable PM2 to start on boot
+pm2 startup
+# (Follow the printed instructions)
+
+# View status
+pm2 status
+
+# View logs
+pm2 logs signet-daemon
+pm2 logs signet-ui
+
+# Restart services
+pm2 restart signet-daemon
+pm2 restart signet-ui
+
+# Stop services
+pm2 stop all
+
+# Monitor in real-time
+pm2 monit
+```
+
+### Notes
+
+- `max_memory_restart` automatically restarts if memory usage exceeds the threshold
+- `max_restarts` and `min_uptime` prevent restart loops
+- PM2 provides built-in log rotation with `pm2 install pm2-logrotate`
+- Use `pm2 monit` for real-time CPU/memory monitoring
+
+## Docker Compose
+
+Docker provides built-in restart policies for automatic recovery.
+
+### Restart Policies
+
+The `docker-compose.yml` uses `restart: unless-stopped` by default:
+
+```yaml
+services:
+  signet-daemon:
+    restart: unless-stopped
+    # ...
+
+  signet-ui:
+    restart: unless-stopped
+    # ...
+```
+
+Available restart policies:
+
+| Policy | Behavior |
+|--------|----------|
+| `no` | Never restart (default) |
+| `always` | Always restart, even after manual stop |
+| `unless-stopped` | Restart unless explicitly stopped |
+| `on-failure` | Only restart on non-zero exit code |
+| `on-failure:3` | Restart on failure, max 3 attempts |
+
+### Health Checks
+
+Add health checks to detect unresponsive containers:
+
+```yaml
+services:
+  signet-daemon:
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/dashboard/stats"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # ...
+
+  signet-ui:
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4174"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      signet-daemon:
+        condition: service_healthy
+    # ...
+```
+
+With health checks:
+- Docker marks containers as `unhealthy` if checks fail
+- Combined with `restart: unless-stopped`, unhealthy containers are restarted
+- `depends_on: condition: service_healthy` ensures UI starts only after daemon is healthy
+
+### Viewing Logs
+
+```bash
+# Follow logs for all services
+docker compose logs -f
+
+# Follow logs for specific service
+docker compose logs -f signet-daemon
+
+# View last 100 lines
+docker compose logs --tail=100
+
+# View logs with timestamps
+docker compose logs -t
+```
+
+### Usage
+
+```bash
+# Start with restart policy
+docker compose up -d
+
+# Check health status
+docker compose ps
+
+# Restart a specific service
+docker compose restart signet-daemon
+
+# Update and restart
+docker compose pull
+docker compose up -d --build
+```
+
+## Process Supervisor Comparison
+
+| Feature | systemd | runit | PM2 | Docker |
+|---------|---------|-------|-----|--------|
+| Platform | Linux | Linux | Any | Any |
+| Auto-restart | ✓ | ✓ | ✓ | ✓ |
+| Boot startup | ✓ | ✓ | ✓ | ✓ |
+| Log management | journald | svlogd | Built-in | Docker logs |
+| Memory limits | cgroups | - | Built-in | Built-in |
+| Health checks | - | - | - | Built-in |
+| Real-time monitoring | journalctl | tail | pm2 monit | docker stats |
+
+**Recommendations:**
+- **systemd**: Best for dedicated Linux servers
+- **runit**: Best for Void Linux or minimal setups
+- **PM2**: Best for development or cross-platform needs
+- **Docker**: Best for containerized deployments with health checks

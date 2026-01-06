@@ -225,16 +225,20 @@ export class SubscriptionManager {
             const healthy = await this.pingRelays();
             if (healthy) {
                 console.log('Relay health check passed (EOSE received)');
+                this.pool.reportHealthCheckSuccess();
                 this.emit({ type: 'health-check-passed' });
             } else {
                 console.log('Relay health check FAILED (no EOSE), scheduling subscription refresh');
+                const poolReset = this.pool.reportHealthCheckFailure();
                 this.emit({ type: 'health-check-failed' });
-                this.scheduleRestart('health-check-failed');
+                // Always restart subscriptions - if pool was reset, subscriptions need recreating
+                this.scheduleRestart(poolReset ? 'pool-reset' : 'health-check-failed');
             }
         } catch (error) {
             console.log(`Relay health check error: ${(error as Error).message}, scheduling subscription refresh`);
+            const poolReset = this.pool.reportHealthCheckFailure();
             this.emit({ type: 'health-check-failed', data: { error: (error as Error).message } });
-            this.scheduleRestart('health-check-error');
+            this.scheduleRestart(poolReset ? 'pool-reset' : 'health-check-error');
         }
     }
 

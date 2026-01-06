@@ -1,4 +1,5 @@
 import prisma from '../../db.js';
+import type { ApprovalType } from '../lib/acl.js';
 
 export interface LogEntry {
     id: number;
@@ -8,6 +9,7 @@ export interface LogEntry {
     params: string | null;
     keyUserId: number | null;
     autoApproved: boolean;
+    approvalType: string | null;
     keyName: string | null;
     remotePubkey: string | null;
     KeyUser?: {
@@ -27,6 +29,7 @@ export interface ActivityEntry {
     userPubkey?: string;
     appName?: string;
     autoApproved: boolean;
+    approvalType?: ApprovalType;
 }
 
 export class LogRepository {
@@ -36,6 +39,7 @@ export class LogRepository {
         params?: string;
         keyUserId?: number;
         autoApproved?: boolean;
+        approvalType?: ApprovalType;
         keyName?: string;
         remotePubkey?: string;
     }): Promise<LogEntry> {
@@ -47,6 +51,7 @@ export class LogRepository {
                 params: data.params,
                 keyUserId: data.keyUserId,
                 autoApproved: data.autoApproved ?? false,
+                approvalType: data.approvalType,
                 keyName: data.keyName,
                 remotePubkey: data.remotePubkey,
             },
@@ -119,6 +124,7 @@ export class LogRepository {
             userPubkey: log.KeyUser?.userPubkey ?? log.remotePubkey ?? undefined,
             appName: log.KeyUser?.description ?? undefined,
             autoApproved: log.autoApproved,
+            approvalType: log.approvalType as ApprovalType | undefined,
         };
     }
 }

@@ -77,6 +77,7 @@ export async function processRequestWebHandler(
             data: {
                 allowed: true,
                 processedAt: new Date(),
+                approvalType: 'manual',
             },
         });
 
@@ -126,6 +127,7 @@ export async function processRequestWebHandler(
                         method: record.method,
                         params: record.params,
                         keyUserId: keyUser.id,
+                        approvalType: 'manual',
                     },
                 });
             }

@@ -59,11 +59,14 @@ The signed APK will be at `app/build/outputs/apk/release/signet-<version>-releas
 ## Features
 
 - **QR code scanner**: Scan the QR code from daemon startup to quickly configure the server URL
+- **Bunker URI QR codes**: Generate one-time connection tokens and display as scannable QR codes with countdown timer
 - **Real-time notifications**: Get notified immediately when apps request approval
 - **Background service**: Maintains connection to daemon even when app is closed
 - **Auto-start on boot**: Service starts automatically when your device boots
 - **Encrypted key support**: Enter passphrases to approve requests for encrypted keys
+- **Password manager autofill**: All passphrase fields support Android Autofill for password managers (Proton Pass, 1Password, etc.)
 - **App lock**: Require fingerprint, face, or device PIN to open the app
+- **Timed app suspension**: Suspend apps until a specific date/time with auto-resume
 - **Full request management**: Approve, deny, and review request history
 
 ## Architecture
@@ -105,6 +108,7 @@ The signed APK will be at `app/build/outputs/apk/release/signet-<version>-releas
 | JSON | kotlinx.serialization |
 | State | ViewModel + StateFlow |
 | Storage | DataStore |
+| QR Codes | qrose (display), CameraX + ML Kit (scanning) |
 | Theme | Material 3 (purple accent) |
 | Min SDK | API 26 (Android 8.0) |
 

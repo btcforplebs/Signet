@@ -158,6 +158,7 @@ List authorization requests.
       "requiresPassword": false,
       "processedAt": null,
       "autoApproved": false,
+      "approvalType": "manual",
       "appName": "Primal",
       "allowed": true
     }
@@ -170,6 +171,16 @@ List authorization requests.
 | Field | Type | Description |
 |-------|------|-------------|
 | `allowed` | boolean \| null | `true` = approved, `false` = denied, `null` = pending/expired |
+| `approvalType` | string \| null | How the request was approved (see table below) |
+
+**Approval Types:**
+
+| Value | Description | UI Badge |
+|-------|-------------|----------|
+| `manual` | User clicked Approve | ✓ Approved |
+| `auto_trust` | Auto-approved by app's trust level | 🛡 Approved |
+| `auto_permission` | Auto-approved by "Always Allow" permission | 🔁 Approved |
+| `null` | Not yet approved or denied | - |
 
 ---
 
@@ -364,6 +375,29 @@ Unlock an encrypted key.
 
 ---
 
+#### `POST /keys/:keyName/lock`
+
+Lock an active key, removing it from memory. The key remains encrypted on disk; all apps and permissions are preserved. When unlocked again, the key resumes with all existing connections.
+
+**Authentication:** Required
+**CSRF:** Required
+
+**Request Body:** Empty object `{}`
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Errors:**
+- `400` - Key is not active (already locked or offline)
+- `400` - Cannot lock unencrypted key (must set passphrase first)
+- `404` - Key not found
+
+---
+
 #### `POST /keys/:keyName/set-passphrase`
 
 Encrypt an unencrypted key with a passphrase.
@@ -385,6 +419,42 @@ Encrypt an unencrypted key with a passphrase.
   "ok": true
 }
 ```
+
+---
+
+#### `POST /keys/:keyName/connection-token`
+
+Generate a one-time connection token for a key. Returns a bunker URI with a token that expires in 5 minutes and can only be used once.
+
+**Authentication:** Required
+**CSRF:** Required
+**Rate Limited:** Yes (10 req/min)
+
+**Request Body:** Empty object `{}`
+
+**Response:**
+```json
+{
+  "ok": true,
+  "bunkerUri": "bunker://npub...?relay=wss://...&secret=<one-time-token>",
+  "expiresAt": "2025-01-15T10:35:00.000Z"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bunkerUri` | string | Complete bunker URI with one-time token |
+| `expiresAt` | string | ISO 8601 timestamp when token expires (5 minutes from creation) |
+
+**Errors:**
+- `400` - Key is not active (locked or offline)
+- `404` - Key not found
+
+**Notes:**
+- The token in the URI differs from the persistent `admin.secret`
+- Each call generates a unique token
+- Tokens are single-use: once redeemed, they cannot be used again
+- After initial connection, the client's pubkey is remembered and no token is needed for future requests
 
 ---
 
@@ -434,6 +504,8 @@ List all connected applications.
       "permissions": ["sign_event", "nip04_encrypt"],
       "connectedAt": "2025-01-10T08:00:00.000Z",
       "lastUsedAt": "2025-01-15T10:30:00.000Z",
+      "suspendedAt": null,
+      "suspendUntil": null,
       "requestCount": 42,
       "methodBreakdown": {
         "sign_event": 35,
@@ -448,6 +520,13 @@ List all connected applications.
   ]
 }
 ```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `suspendedAt` | string \| null | ISO 8601 timestamp when app was suspended, or null if active |
+| `suspendUntil` | string \| null | ISO 8601 timestamp when suspension ends (auto-resume), or null for indefinite |
 
 **Trust Levels:**
 - `paranoid` - Always ask for approval (including reconnects)
@@ -500,6 +579,68 @@ Revoke an app's access.
 
 ---
 
+#### `POST /apps/:id/suspend`
+
+Suspend an app, temporarily blocking all signing requests.
+
+**Authentication:** Required
+**CSRF:** Required
+
+**Request Body:**
+```json
+{
+  "until": "2025-01-20T15:00:00.000Z"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `until` | string | No | ISO 8601 timestamp when suspension should automatically end. If omitted, suspension is indefinite until manually resumed. |
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Errors:**
+- `400` - Invalid app ID
+- `400` - Invalid date format for "until"
+- `400` - "until" must be in the future
+- `400` - App is already suspended
+- `404` - App not found
+
+**Notes:**
+- Suspended apps cannot make any signing requests
+- The ACL automatically checks if the suspension has expired and allows requests after `suspendUntil` passes
+- Use `POST /apps/:id/unsuspend` to manually resume before the scheduled time
+
+---
+
+#### `POST /apps/:id/unsuspend`
+
+Resume a suspended app, allowing signing requests again.
+
+**Authentication:** Required
+**CSRF:** Required
+
+**Request Body:** Empty object `{}`
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Errors:**
+- `400` - Invalid app ID
+- `400` - App is not suspended
+- `404` - App not found
+
+---
+
 ### Dashboard
 
 #### `GET /dashboard`
@@ -524,14 +665,25 @@ Get dashboard statistics and recent activity.
       "timestamp": "2025-01-15T10:30:00.000Z",
       "type": "approval",
       "method": "sign_event",
+      "eventKind": 1,
       "keyName": "main-key",
       "userPubkey": "hex...",
       "appName": "Primal",
-      "autoApproved": false
+      "autoApproved": false,
+      "approvalType": "manual"
     }
   ]
 }
 ```
+
+**Activity Entry Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `approval` or `denial` |
+| `autoApproved` | boolean | `true` if auto-approved (backwards compat) |
+| `approvalType` | string \| undefined | `manual`, `auto_trust`, or `auto_permission` |
+| `eventKind` | number \| undefined | Event kind for `sign_event` requests |
 
 **Activity Entry Types:**
 
@@ -575,6 +727,7 @@ eventSource.onmessage = (event) => {
 | `app:updated` | App description or trust level changed | `{ app: ConnectedApp }` |
 | `key:created` | Key was created | `{ key: KeyInfo }` |
 | `key:unlocked` | Key was unlocked | `{ keyName: string }` |
+| `key:locked` | Key was locked | `{ keyName: string }` |
 | `key:deleted` | Key was deleted | `{ keyName: string }` |
 | `key:renamed` | Key was renamed | `{ oldName: string, newName: string }` |
 | `key:updated` | Key encryption status changed | `{ keyName: string }` |
@@ -868,5 +1021,6 @@ import type {
   DashboardStats,
   ActivityEntry,
   TrustLevel,
+  ApprovalType,  // 'manual' | 'auto_trust' | 'auto_permission'
 } from '@signet/types';
 ```

@@ -14,6 +14,8 @@ interface UseAppsResult {
     revokeApp: (appId: number) => Promise<boolean>;
     updateDescription: (appId: number, description: string) => Promise<boolean>;
     updateTrustLevel: (appId: number, trustLevel: TrustLevel) => Promise<boolean>;
+    suspendApp: (appId: number, until?: Date) => Promise<boolean>;
+    unsuspendApp: (appId: number) => Promise<boolean>;
     clearError: () => void;
 }
 
@@ -116,6 +118,31 @@ export function useApps(): UseAppsResult {
         { errorPrefix: 'Failed to update trust level', onSuccess: refresh, onError: setError }
     );
 
+    // Suspend app mutation
+    const suspendMutation = useMutation(
+        async ({ appId, until }: { appId: number; until?: Date }) => {
+            const body = until ? { until: until.toISOString() } : {};
+            const result = await apiPost<{ ok?: boolean; error?: string }>(`/apps/${appId}/suspend`, body);
+            if (!result?.ok) {
+                throw new Error(result?.error ?? 'Failed to suspend app');
+            }
+            return true;
+        },
+        { errorPrefix: 'Failed to suspend app', onSuccess: refresh, onError: setError }
+    );
+
+    // Unsuspend app mutation
+    const unsuspendMutation = useMutation(
+        async (appId: number) => {
+            const result = await apiPost<{ ok?: boolean; error?: string }>(`/apps/${appId}/unsuspend`, {});
+            if (!result?.ok) {
+                throw new Error(result?.error ?? 'Failed to unsuspend app');
+            }
+            return true;
+        },
+        { errorPrefix: 'Failed to unsuspend app', onSuccess: refresh, onError: setError }
+    );
+
     // Wrapper functions to maintain the same API
     const revokeApp = useCallback(async (appId: number): Promise<boolean> => {
         const result = await revokeMutation.mutate(appId);
@@ -132,6 +159,16 @@ export function useApps(): UseAppsResult {
         return result ?? false;
     }, [trustLevelMutation]);
 
+    const suspendApp = useCallback(async (appId: number, until?: Date): Promise<boolean> => {
+        const result = await suspendMutation.mutate({ appId, until });
+        return result ?? false;
+    }, [suspendMutation]);
+
+    const unsuspendApp = useCallback(async (appId: number): Promise<boolean> => {
+        const result = await unsuspendMutation.mutate(appId);
+        return result ?? false;
+    }, [unsuspendMutation]);
+
     const clearError = useCallback(() => {
         setError(null);
     }, []);
@@ -140,7 +177,9 @@ export function useApps(): UseAppsResult {
     const combinedError = error
         || revokeMutation.error
         || descriptionMutation.error
-        || trustLevelMutation.error;
+        || trustLevelMutation.error
+        || suspendMutation.error
+        || unsuspendMutation.error;
 
     return {
         apps,
@@ -150,6 +189,8 @@ export function useApps(): UseAppsResult {
         revokeApp,
         updateDescription,
         updateTrustLevel,
+        suspendApp,
+        unsuspendApp,
         clearError,
     };
 }

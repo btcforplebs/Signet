@@ -71,3 +71,34 @@ fun DateGroup.toDisplayString(): String = when (this) {
     DateGroup.THIS_WEEK -> "This Week"
     DateGroup.OLDER -> "Older"
 }
+
+/**
+ * Formats a future ISO timestamp as a compact string.
+ * Examples: "3:45 PM", "Jan 5, 3:45 PM", "Jan 5, 2027"
+ */
+fun formatFutureTime(timestamp: String): String {
+    return try {
+        val instant = Instant.parse(timestamp)
+        val now = Instant.now()
+        val zonedDateTime = instant.atZone(ZoneId.systemDefault())
+        val today = LocalDate.now()
+        val targetDate = zonedDateTime.toLocalDate()
+
+        when {
+            // If less than 24 hours from now, just show time
+            ChronoUnit.HOURS.between(now, instant) < 24 && targetDate == today -> {
+                zonedDateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
+            }
+            // Same year - show month, day, time
+            targetDate.year == today.year -> {
+                zonedDateTime.format(DateTimeFormatter.ofPattern("MMM d, h:mm a"))
+            }
+            // Different year - show month, day, year
+            else -> {
+                zonedDateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+            }
+        }
+    } catch (e: Exception) {
+        timestamp
+    }
+}

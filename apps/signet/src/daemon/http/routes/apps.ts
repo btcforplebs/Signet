@@ -70,4 +70,52 @@ export function registerAppsRoutes(
             return sendError(reply, error);
         }
     });
+
+    // Suspend an app (POST - needs CSRF)
+    fastify.post('/apps/:id/suspend', { preHandler: [...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
+        const params = request.params as { id: string };
+        const appId = Number(params.id);
+
+        if (!Number.isFinite(appId)) {
+            return reply.code(400).send({ error: 'Invalid app ID' });
+        }
+
+        const body = request.body as { until?: string } | undefined;
+        let until: Date | undefined;
+
+        if (body?.until) {
+            const parsed = new Date(body.until);
+            if (isNaN(parsed.getTime())) {
+                return reply.code(400).send({ error: 'Invalid date format for "until"' });
+            }
+            if (parsed.getTime() <= Date.now()) {
+                return reply.code(400).send({ error: '"until" must be in the future' });
+            }
+            until = parsed;
+        }
+
+        try {
+            await config.appService.suspendApp(appId, until);
+            return reply.send({ ok: true });
+        } catch (error) {
+            return sendError(reply, error);
+        }
+    });
+
+    // Unsuspend an app (POST - needs CSRF)
+    fastify.post('/apps/:id/unsuspend', { preHandler: [...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
+        const params = request.params as { id: string };
+        const appId = Number(params.id);
+
+        if (!Number.isFinite(appId)) {
+            return reply.code(400).send({ error: 'Invalid app ID' });
+        }
+
+        try {
+            await config.appService.unsuspendApp(appId);
+            return reply.send({ ok: true });
+        } catch (error) {
+            return sendError(reply, error);
+        }
+    });
 }

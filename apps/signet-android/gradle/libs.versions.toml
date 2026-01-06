@@ -15,6 +15,7 @@ kotlinxSerialization = "1.7.3"
 kotlinxCoroutines = "1.9.0"
 cameraX = "1.4.1"
 mlkitBarcodeScanning = "17.3.0"
+qrose = "1.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,6 +52,9 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 
 # ML Kit Barcode Scanning
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
+
+# QR Code Generation
+qrose = { group = "io.github.alexzhirkevich", name = "qrose", version.ref = "qrose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Home, Smartphone, Key, Activity, Settings, HelpCircle, ChevronDown, ChevronRight, Link2, Plus } from 'lucide-react';
+import { Home, Smartphone, Key, Activity, Settings, HelpCircle, ChevronDown, ChevronRight, QrCode, Plus, Lock, LockOpen, Loader2 } from 'lucide-react';
 import type { KeyInfo, RelayStatusResponse } from '@signet/types';
-import { copyToClipboard } from '../../lib/clipboard.js';
+import { UnlockKeyModal } from './UnlockKeyModal.js';
+import { BunkerURIModal } from './BunkerURIModal.js';
 import styles from './Sidebar.module.css';
 
 export type NavItem = 'home' | 'apps' | 'activity' | 'keys' | 'help' | 'settings';
@@ -15,6 +16,10 @@ interface SidebarProps {
   onKeySelect?: (keyName: string) => void;
   sseConnected: boolean;
   relayStatus: RelayStatusResponse | null;
+  lockingKey?: string | null;
+  unlockingKey?: string | null;
+  onLockKey?: (keyName: string) => Promise<boolean>;
+  onUnlockKey?: (keyName: string, passphrase: string) => Promise<boolean>;
 }
 
 export function Sidebar({
@@ -26,20 +31,48 @@ export function Sidebar({
   onKeySelect,
   sseConnected,
   relayStatus,
+  lockingKey,
+  unlockingKey,
+  onLockKey,
+  onUnlockKey,
 }: SidebarProps) {
   const [keysExpanded, setKeysExpanded] = useState(true);
   const [relaysExpanded, setRelaysExpanded] = useState(true);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [bunkerModalKey, setBunkerModalKey] = useState<string | null>(null);
+  const [unlockModalKey, setUnlockModalKey] = useState<string | null>(null);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
 
-  const handleCopyBunkerUri = useCallback(async (e: React.MouseEvent, key: KeyInfo) => {
+  const handleShowBunkerUri = useCallback((e: React.MouseEvent, keyName: string) => {
     e.stopPropagation(); // Don't trigger key selection
-    if (!key.bunkerUri) return;
+    setBunkerModalKey(keyName);
+  }, []);
 
-    const success = await copyToClipboard(key.bunkerUri);
+  const handleLockKey = useCallback(async (e: React.MouseEvent, keyName: string) => {
+    e.stopPropagation();
+    if (lockingKey || !onLockKey) return;
+    await onLockKey(keyName);
+  }, [lockingKey, onLockKey]);
+
+  const handleUnlockClick = useCallback((e: React.MouseEvent, keyName: string) => {
+    e.stopPropagation();
+    setUnlockError(null);
+    setUnlockModalKey(keyName);
+  }, []);
+
+  const handleUnlockSubmit = useCallback(async (passphrase: string) => {
+    if (!unlockModalKey || !onUnlockKey) return;
+    setUnlockError(null);
+    const success = await onUnlockKey(unlockModalKey, passphrase);
     if (success) {
-      setCopiedKey(key.name);
-      setTimeout(() => setCopiedKey(null), 2000);
+      setUnlockModalKey(null);
+    } else {
+      setUnlockError('Failed to unlock key. Check your passphrase.');
     }
+  }, [unlockModalKey, onUnlockKey]);
+
+  const handleUnlockCancel = useCallback(() => {
+    setUnlockModalKey(null);
+    setUnlockError(null);
   }, []);
 
   const navItems: { id: NavItem; label: string; icon: React.ReactNode; badge?: number }[] = [
@@ -145,15 +178,50 @@ export function Sidebar({
                         />
                         <span className={styles.keyName}>{key.name}</span>
                       </button>
-                      {key.bunkerUri && key.status === 'online' && (
+                      {/* Lock button for online encrypted keys */}
+                      {key.status === 'online' && key.isEncrypted && onLockKey && (
                         <button
                           type="button"
-                          className={`${styles.copyButton} ${copiedKey === key.name ? styles.copied : ''}`}
-                          onClick={(e) => handleCopyBunkerUri(e, key)}
-                          title={copiedKey === key.name ? 'Copied!' : 'Copy bunker URI'}
-                          aria-label={copiedKey === key.name ? 'Copied!' : 'Copy bunker URI'}
+                          className={styles.lockButton}
+                          onClick={(e) => handleLockKey(e, key.name)}
+                          disabled={lockingKey === key.name}
+                          title="Lock key"
+                          aria-label="Lock key"
                         >
-                          <Link2 size={12} />
+                          {lockingKey === key.name ? (
+                            <Loader2 size={12} className={styles.spinning} />
+                          ) : (
+                            <LockOpen size={12} />
+                          )}
+                        </button>
+                      )}
+                      {/* Unlock button for locked keys */}
+                      {key.status === 'locked' && onUnlockKey && (
+                        <button
+                          type="button"
+                          className={styles.lockButton}
+                          onClick={(e) => handleUnlockClick(e, key.name)}
+                          disabled={unlockingKey === key.name}
+                          title="Unlock key"
+                          aria-label="Unlock key"
+                        >
+                          {unlockingKey === key.name ? (
+                            <Loader2 size={12} className={styles.spinning} />
+                          ) : (
+                            <Lock size={12} />
+                          )}
+                        </button>
+                      )}
+                      {/* Bunker URI button for online keys */}
+                      {key.status === 'online' && (
+                        <button
+                          type="button"
+                          className={styles.copyButton}
+                          onClick={(e) => handleShowBunkerUri(e, key.name)}
+                          title="Show bunker URI"
+                          aria-label="Show bunker URI QR code"
+                        >
+                          <QrCode size={12} />
                         </button>
                       )}
                     </div>
@@ -234,6 +302,23 @@ export function Sidebar({
           <span className={styles.navLabel}>Settings</span>
         </button>
       </div>
+
+      {/* Unlock Key Modal */}
+      <UnlockKeyModal
+        open={unlockModalKey !== null}
+        keyName={unlockModalKey ?? ''}
+        loading={unlockingKey === unlockModalKey}
+        error={unlockError}
+        onSubmit={handleUnlockSubmit}
+        onCancel={handleUnlockCancel}
+      />
+
+      {/* Bunker URI Modal */}
+      <BunkerURIModal
+        open={bunkerModalKey !== null}
+        keyName={bunkerModalKey ?? ''}
+        onClose={() => setBunkerModalKey(null)}
+      />
     </aside>
   );
 }

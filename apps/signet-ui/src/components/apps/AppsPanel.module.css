@@ -558,6 +558,60 @@
   color: white;
 }
 
+/* Suspended state */
+.appCard.suspended {
+  opacity: 0.7;
+}
+
+.appCard.suspended .activityDot {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
+.suspendedBadge {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-muted);
+  color: var(--warning);
+  margin-left: var(--space-2);
+}
+
+.suspendButton {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--warning-muted);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.suspendButton:hover {
+  background: var(--warning);
+  color: white;
+}
+
+.resumeButton {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--success-muted);
+  color: var(--success);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.resumeButton:hover {
+  background: var(--success);
+  color: white;
+}
+
 /* Mobile */
 @media (max-width: 640px) {
   .toolbar {
@@ -628,6 +682,8 @@
   .saveButton,
   .cancelButton,
   .revokeButton,
+  .suspendButton,
+  .resumeButton,
   .trustButton {
     min-height: 44px;
   }

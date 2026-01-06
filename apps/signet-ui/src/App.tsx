@@ -216,6 +216,26 @@ function AppContent() {
               }
               return success;
             }}
+            onSuspendApp={async (appId: number) => {
+              const success = await apps.suspendApp(appId);
+              if (success) {
+                showToast({
+                  message: 'App suspended',
+                  type: 'success',
+                });
+              }
+              return success;
+            }}
+            onUnsuspendApp={async (appId: number) => {
+              const success = await apps.unsuspendApp(appId);
+              if (success) {
+                showToast({
+                  message: 'App resumed',
+                  type: 'success',
+                });
+              }
+              return success;
+            }}
             onClearError={apps.clearError}
             onNavigateToHelp={() => setActiveNav('help')}
           />
@@ -277,11 +297,13 @@ function AppContent() {
             creating={keys.creating}
             deleting={keys.deleting}
             unlocking={keys.unlocking}
+            locking={keys.locking}
             renaming={keys.renaming}
             settingPassphrase={keys.settingPassphrase}
             onCreateKey={keys.createKey}
             onDeleteKey={keys.deleteKey}
             onUnlockKey={keys.unlockKey}
+            onLockKey={keys.lockKey}
             onRenameKey={keys.renameKey}
             onSetPassphrase={keys.setPassphrase}
             onClearError={keys.clearError}
@@ -315,6 +337,10 @@ function AppContent() {
       sseConnected={sseConnected}
       onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       relayStatus={relays.relays}
+      lockingKey={keys.locking}
+      unlockingKey={keys.unlocking}
+      onLockKey={keys.lockKey}
+      onUnlockKey={keys.unlockKey}
     >
       {renderContent()}
 

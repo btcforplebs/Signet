@@ -48,7 +48,12 @@ import tech.geektoshi.signet.ui.theme.TextMuted
 import tech.geektoshi.signet.ui.theme.TextPrimary
 import tech.geektoshi.signet.ui.theme.Warning
 import tech.geektoshi.signet.util.formatRelativeTime
+import tech.geektoshi.signet.util.formatFutureTime
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +70,10 @@ fun AppDetailSheet(
     var appName by remember { mutableStateOf(app.description ?: "") }
     var selectedTrustLevel by remember { mutableStateOf(app.trustLevel) }
     var showRevokeConfirm by remember { mutableStateOf(false) }
+    var showSuspendDialog by remember { mutableStateOf(false) }
+    var suspendType by remember { mutableStateOf("indefinite") }
+    var suspendDate by remember { mutableStateOf(LocalDate.now().plusDays(1)) }
+    var suspendTime by remember { mutableStateOf(LocalTime.of(12, 0)) }
 
     val hasChanges = appName != (app.description ?: "") || selectedTrustLevel != app.trustLevel
 
@@ -81,7 +90,7 @@ fun AppDetailSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header: App name + Trust level
+            // Header: App name + badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -92,7 +101,15 @@ fun AppDetailSheet(
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
-                TrustLevelBadge(trustLevel = app.trustLevel)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (app.suspendedAt != null) {
+                        SuspendedBadge(suspendUntil = app.suspendUntil)
+                    }
+                    TrustLevelBadge(trustLevel = app.trustLevel)
+                }
             }
 
             // Summary: key • requests • last used
@@ -229,55 +246,300 @@ fun AppDetailSheet(
                     }
                 }
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { showRevokeConfirm = true },
-                        enabled = !isLoading,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Danger
-                        )
-                    ) {
-                        Text("Revoke")
-                    }
-
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                isLoading = true
-                                error = null
-                                try {
-                                    val client = SignetApiClient(daemonUrl)
-                                    val result = client.updateApp(
-                                        id = app.id,
-                                        description = if (appName != (app.description ?: "")) appName.ifBlank { null } else null,
-                                        trustLevel = if (selectedTrustLevel != app.trustLevel) selectedTrustLevel else null
-                                    )
-                                    client.close()
-                                    if (result.ok) {
-                                        onActionComplete()
-                                        onDismiss()
-                                    } else {
-                                        error = result.error ?: "Failed to update"
+                    // Suspend/Resume button
+                    val isSuspended = app.suspendedAt != null
+                    if (isSuspended) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    isLoading = true
+                                    error = null
+                                    try {
+                                        val client = SignetApiClient(daemonUrl)
+                                        val result = client.unsuspendApp(app.id)
+                                        client.close()
+                                        if (result.ok) {
+                                            onActionComplete()
+                                            onDismiss()
+                                        } else {
+                                            error = result.error ?: "Failed to resume"
+                                        }
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "Failed to resume"
+                                    } finally {
+                                        isLoading = false
                                     }
-                                } catch (e: Exception) {
-                                    error = e.message ?: "Failed to update"
-                                } finally {
-                                    isLoading = false
+                                }
+                            },
+                            enabled = !isLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Success,
+                                contentColor = TextPrimary
+                            )
+                        ) {
+                            Text("Resume App")
+                        }
+                    } else if (showSuspendDialog) {
+                        // Suspend dialog content
+                        Text(
+                            text = "Suspend Duration",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Indefinite option
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (suspendType == "indefinite") SignetPurple else BorderDefault,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .background(if (suspendType == "indefinite") SignetPurple.copy(alpha = 0.1f) else BgTertiary)
+                                    .clickable { suspendType = "indefinite" }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .border(2.dp, if (suspendType == "indefinite") SignetPurple else TextMuted, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (suspendType == "indefinite") {
+                                        Box(modifier = Modifier.size(10.dp).background(SignetPurple, CircleShape))
+                                    }
+                                }
+                                Text("Until I turn it back on", color = TextPrimary)
+                            }
+
+                            // Timed option
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (suspendType == "until") SignetPurple else BorderDefault,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .background(if (suspendType == "until") SignetPurple.copy(alpha = 0.1f) else BgTertiary)
+                                    .clickable { suspendType = "until" }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .border(2.dp, if (suspendType == "until") SignetPurple else TextMuted, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (suspendType == "until") {
+                                        Box(modifier = Modifier.size(10.dp).background(SignetPurple, CircleShape))
+                                    }
+                                }
+                                Text("Until a specific date and time", color = TextPrimary)
+                            }
+                        }
+
+                        // Date/time inputs when timed option selected
+                        if (suspendType == "until") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = suspendDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+                                    onValueChange = { },
+                                    readOnly = true,
+                                    label = { Text("Date") },
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = SignetPurple,
+                                        unfocusedBorderColor = BorderDefault,
+                                        focusedTextColor = TextPrimary,
+                                        unfocusedTextColor = TextPrimary,
+                                        focusedLabelColor = SignetPurple,
+                                        unfocusedLabelColor = TextMuted
+                                    )
+                                )
+                                OutlinedTextField(
+                                    value = suspendTime.format(DateTimeFormatter.ofPattern("h:mm a")),
+                                    onValueChange = { },
+                                    readOnly = true,
+                                    label = { Text("Time") },
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = SignetPurple,
+                                        unfocusedBorderColor = BorderDefault,
+                                        focusedTextColor = TextPrimary,
+                                        unfocusedTextColor = TextPrimary,
+                                        focusedLabelColor = SignetPurple,
+                                        unfocusedLabelColor = TextMuted
+                                    )
+                                )
+                            }
+
+                            // Quick date buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        suspendDate = LocalDate.now()
+                                        suspendTime = LocalTime.now().plusHours(1)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("+1h", style = MaterialTheme.typography.bodySmall)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        suspendDate = LocalDate.now()
+                                        suspendTime = LocalTime.now().plusHours(8)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("+8h", style = MaterialTheme.typography.bodySmall)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        suspendDate = LocalDate.now().plusDays(1)
+                                        suspendTime = LocalTime.of(9, 0)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Tomorrow", style = MaterialTheme.typography.bodySmall)
                                 }
                             }
-                        },
-                        enabled = !isLoading && hasChanges,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SignetPurple,
-                            contentColor = TextPrimary
-                        )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { showSuspendDialog = false },
+                                enabled = !isLoading,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Cancel")
+                            }
+
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        isLoading = true
+                                        error = null
+                                        try {
+                                            val client = SignetApiClient(daemonUrl)
+                                            val until = if (suspendType == "until") {
+                                                suspendDate.atTime(suspendTime)
+                                                    .atZone(ZoneId.systemDefault())
+                                                    .toInstant()
+                                                    .toString()
+                                            } else null
+                                            val result = client.suspendApp(app.id, until)
+                                            client.close()
+                                            if (result.ok) {
+                                                onActionComplete()
+                                                onDismiss()
+                                            } else {
+                                                error = result.error ?: "Failed to suspend"
+                                            }
+                                        } catch (e: Exception) {
+                                            error = e.message ?: "Failed to suspend"
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                },
+                                enabled = !isLoading,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Warning,
+                                    contentColor = TextPrimary
+                                )
+                            ) {
+                                Text("Suspend")
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = { showSuspendDialog = true },
+                            enabled = !isLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Warning,
+                                contentColor = TextPrimary
+                            )
+                        ) {
+                            Text("Suspend App")
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Save")
+                        OutlinedButton(
+                            onClick = { showRevokeConfirm = true },
+                            enabled = !isLoading,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Danger
+                            )
+                        ) {
+                            Text("Revoke")
+                        }
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    isLoading = true
+                                    error = null
+                                    try {
+                                        val client = SignetApiClient(daemonUrl)
+                                        val result = client.updateApp(
+                                            id = app.id,
+                                            description = if (appName != (app.description ?: "")) appName.ifBlank { null } else null,
+                                            trustLevel = if (selectedTrustLevel != app.trustLevel) selectedTrustLevel else null
+                                        )
+                                        client.close()
+                                        if (result.ok) {
+                                            onActionComplete()
+                                            onDismiss()
+                                        } else {
+                                            error = result.error ?: "Failed to update"
+                                        }
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "Failed to update"
+                                    } finally {
+                                        isLoading = false
+                                    }
+                                }
+                            },
+                            enabled = !isLoading && hasChanges,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SignetPurple,
+                                contentColor = TextPrimary
+                            )
+                        ) {
+                            Text("Save")
+                        }
                     }
                 }
             }
@@ -307,6 +569,26 @@ private fun TrustLevelBadge(trustLevel: String) {
         text = label,
         style = MaterialTheme.typography.labelMedium,
         color = color
+    )
+}
+
+@Composable
+fun SuspendedBadge(suspendUntil: String? = null) {
+    val text = if (suspendUntil != null) {
+        "Until ${formatFutureTime(suspendUntil)}"
+    } else {
+        "Suspended"
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = Warning,
+        modifier = Modifier
+            .background(
+                color = Warning.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp)
     )
 }
 

@@ -124,6 +124,13 @@ export class EventService {
     }
 
     /**
+     * Emit a key:locked event
+     */
+    emitKeyLocked(keyName: string): void {
+        this.emit({ type: 'key:locked', keyName });
+    }
+
+    /**
      * Emit a key:deleted event
      */
     emitKeyDeleted(keyName: string): void {

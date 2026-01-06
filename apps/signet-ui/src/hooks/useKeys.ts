@@ -20,11 +20,13 @@ interface UseKeysResult {
     createKey: (data: { keyName: string; passphrase?: string; nsec?: string }) => Promise<KeyInfo | null>;
     deleteKey: (keyName: string, passphrase?: string) => Promise<{ success: boolean; revokedApps?: number }>;
     unlockKey: (keyName: string, passphrase: string) => Promise<boolean>;
+    lockKey: (keyName: string) => Promise<boolean>;
     renameKey: (keyName: string, newName: string) => Promise<boolean>;
     setPassphrase: (keyName: string, passphrase: string) => Promise<boolean>;
     creating: boolean;
     deleting: boolean;
-    unlocking: boolean;
+    unlocking: string | null;  // Key name being unlocked, or null
+    locking: string | null;    // Key name being locked, or null
     renaming: boolean;
     settingPassphrase: boolean;
     clearError: () => void;
@@ -34,6 +36,8 @@ export function useKeys(): UseKeysResult {
     const [keys, setKeys] = useState<KeyInfo[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [lockingKeyName, setLockingKeyName] = useState<string | null>(null);
+    const [unlockingKeyName, setUnlockingKeyName] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
         setLoading(true);
@@ -65,6 +69,7 @@ export function useKeys(): UseKeysResult {
         if (
             event.type === 'key:created' ||
             event.type === 'key:unlocked' ||
+            event.type === 'key:locked' ||
             event.type === 'key:deleted' ||
             event.type === 'key:renamed' ||
             event.type === 'key:updated'
@@ -120,6 +125,20 @@ export function useKeys(): UseKeysResult {
         { errorPrefix: 'Failed to unlock key', onSuccess: refresh, onError: setError }
     );
 
+    // Lock key mutation
+    const lockMutation = useMutation(
+        async ({ keyName }: { keyName: string }) => {
+            const result = await apiPost<{ ok?: boolean; error?: string }>(
+                `/keys/${encodeURIComponent(keyName)}/lock`
+            );
+            if (!result.ok) {
+                throw new Error(result.error || 'Failed to lock key');
+            }
+            return true;
+        },
+        { errorPrefix: 'Failed to lock key', onSuccess: refresh, onError: setError }
+    );
+
     // Rename key mutation
     const renameMutation = useMutation(
         async ({ keyName, newName }: { keyName: string; newName: string }) => {
@@ -167,9 +186,24 @@ export function useKeys(): UseKeysResult {
     }, [deleteMutation]);
 
     const unlockKey = useCallback(async (keyName: string, passphrase: string) => {
-        const result = await unlockMutation.mutate({ keyName, passphrase });
-        return result ?? false;
+        setUnlockingKeyName(keyName);
+        try {
+            const result = await unlockMutation.mutate({ keyName, passphrase });
+            return result ?? false;
+        } finally {
+            setUnlockingKeyName(null);
+        }
     }, [unlockMutation]);
+
+    const lockKey = useCallback(async (keyName: string) => {
+        setLockingKeyName(keyName);
+        try {
+            const result = await lockMutation.mutate({ keyName });
+            return result ?? false;
+        } finally {
+            setLockingKeyName(null);
+        }
+    }, [lockMutation]);
 
     const renameKey = useCallback(async (keyName: string, newName: string) => {
         const result = await renameMutation.mutate({ keyName, newName });
@@ -190,6 +224,7 @@ export function useKeys(): UseKeysResult {
         || createMutation.error
         || deleteMutation.error
         || unlockMutation.error
+        || lockMutation.error
         || renameMutation.error
         || setPassphraseMutation.error;
 
@@ -201,11 +236,13 @@ export function useKeys(): UseKeysResult {
         createKey,
         deleteKey,
         unlockKey,
+        lockKey,
         renameKey,
         setPassphrase,
         creating: createMutation.loading,
         deleting: deleteMutation.loading,
-        unlocking: unlockMutation.loading,
+        unlocking: unlockingKeyName,
+        locking: lockingKeyName,
         renaming: renameMutation.loading,
         settingPassphrase: setPassphraseMutation.loading,
         clearError,

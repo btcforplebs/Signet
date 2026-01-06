@@ -10,6 +10,8 @@ export interface AppRecord {
     createdAt: Date;
     lastUsedAt: Date | null;
     revokedAt: Date | null;
+    suspendedAt: Date | null;
+    suspendUntil: Date | null;
     signingConditions: Array<{
         id: number;
         method: string | null;
@@ -207,6 +209,38 @@ export class AppRepository {
         // Invalidate all cache entries for this key
         invalidateAclCacheForKey(keyName);
         return result.count;
+    }
+
+    /**
+     * Suspend an app, preventing all requests until unsuspended.
+     * @param id - The app ID
+     * @param until - Optional date when suspension should automatically end
+     */
+    async suspend(id: number, until?: Date): Promise<void> {
+        const keyUser = await prisma.keyUser.update({
+            where: { id },
+            data: {
+                suspendedAt: new Date(),
+                suspendUntil: until ?? null,
+            },
+            select: { keyName: true, userPubkey: true },
+        });
+        invalidateAclCache(keyUser.keyName, keyUser.userPubkey);
+    }
+
+    /**
+     * Unsuspend an app, allowing requests again.
+     */
+    async unsuspend(id: number): Promise<void> {
+        const keyUser = await prisma.keyUser.update({
+            where: { id },
+            data: {
+                suspendedAt: null,
+                suspendUntil: null,
+            },
+            select: { keyName: true, userPubkey: true },
+        });
+        invalidateAclCache(keyUser.keyName, keyUser.userPubkey);
     }
 }
 

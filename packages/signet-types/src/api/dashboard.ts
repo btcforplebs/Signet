@@ -10,6 +10,14 @@ export interface DashboardStats {
 }
 
 /**
+ * Approval type for activity tracking
+ * - manual: User explicitly approved via web UI or API
+ * - auto_trust: Auto-approved by trust level rules
+ * - auto_permission: Auto-approved by previous "Always Allow" (SigningCondition)
+ */
+export type ApprovalType = 'manual' | 'auto_trust' | 'auto_permission';
+
+/**
  * A single activity entry for the dashboard timeline
  */
 export interface ActivityEntry {
@@ -22,6 +30,7 @@ export interface ActivityEntry {
     userPubkey?: string;
     appName?: string;
     autoApproved: boolean;
+    approvalType?: ApprovalType;
 }
 
 /**

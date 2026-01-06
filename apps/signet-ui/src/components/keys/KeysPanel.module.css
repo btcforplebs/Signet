@@ -490,6 +490,31 @@
   color: var(--text-primary);
 }
 
+/* Lock */
+.lockButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lockButton:hover {
+  background: var(--warning);
+  color: white;
+}
+
+.lockButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .renameRow {
   display: flex;
   gap: var(--space-2);
@@ -644,6 +669,20 @@
   font-size: var(--text-sm);
 }
 
+/* Loading spinner */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Mobile */
 @media (max-width: 640px) {
   .keyHeader {
@@ -683,7 +722,8 @@
   }
 
   .deleteButton,
-  .renameButton {
+  .renameButton,
+  .lockButton {
     width: 100%;
     justify-content: center;
   }
@@ -721,6 +761,7 @@
   .unlockButton,
   .deleteButton,
   .renameButton,
+  .lockButton,
   .saveButton,
   .cancelButton {
     min-height: 44px;
