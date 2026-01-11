@@ -16,8 +16,8 @@ import { getKillSwitchClientInfo } from '../lib/client-info.js';
 import { TTLCache } from '../lib/ttl-cache.js';
 import { toErrorMessage } from '../lib/errors.js';
 
-// TTL for processed event IDs: 24 hours (events older than this won't be replayed)
-const PROCESSED_EVENT_TTL_MS = 24 * 60 * 60 * 1000;
+// TTL for processed event IDs: 1 hour (reduced from 24h to limit memory usage)
+const PROCESSED_EVENT_TTL_MS = 60 * 60 * 1000;
 // Max processed events to track (prevents unbounded growth)
 const PROCESSED_EVENT_MAX_SIZE = 10_000;
 
@@ -184,6 +184,8 @@ export class AdminCommandService {
     private closeAllWebsockets(): void {
         for (const ws of this.websockets) {
             try {
+                // Remove all event listeners before closing to prevent memory leaks
+                ws.removeAllListeners();
                 ws.close();
             } catch {
                 // Ignore close errors

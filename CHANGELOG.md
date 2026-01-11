@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.1]
+
+### Fixed
+- **Daemon: Memory leak in AdminCommandService (kill switch)**
+  - WebSocket event listeners were not removed when connections closed during refresh cycles
+  - Each refresh created new connections with 4 event handlers that kept references to captured variables
+  - Added `ws.removeAllListeners()` before closing WebSockets to properly release memory
+  - Reduced `processedEventIds` cache TTL from 24 hours to 1 hour to limit memory usage
+- **Daemon: Memory leak in SSE event handlers**
+  - Event listeners registered on request/response objects were never removed after cleanup
+  - Refactored to use named handler functions that are explicitly removed with `.off()` on disconnect
+  - Prevents closure accumulation when SSE clients reconnect
+
+---
+
 ## [1.6.0]
 
 ### Added
